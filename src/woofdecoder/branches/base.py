@@ -79,7 +79,7 @@ class BranchOutput:
 
         for position, subtype_name in enumerate(SUBTYPES):
             result[subtype_name] = float(self.probs[position])
-            
+
         return result
 
 
