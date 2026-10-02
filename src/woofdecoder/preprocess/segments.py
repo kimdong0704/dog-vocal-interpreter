@@ -24,11 +24,11 @@ class BarkSegment:
 
     start_s: float
     end_s: float
-    audio: np.ndarray | None = None  # shape (num_samples,), mono float32
-    sample_rate: int = 16_000  # 16 kHz
-    frames: list[np.ndarray] = field(default_factory=list)  # each shape (H, W, 3), RGB uint8
-    frame_times_s: list[float] = field(default_factory=list)  # timestamp of each frame in sec
-    source_id: str = ""  # for logging and debugging purposes
+    audio: np.ndarray | None = None
+    sample_rate: int = 16_000
+    frames: list[np.ndarray] = field(default_factory=list)
+    frame_times_s: list[float] = field(default_factory=list)
+    source_id: str = ""
 
     @property
     def duration_s(self) -> float:
