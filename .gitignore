@@ -217,6 +217,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# AI
+CLAUDE.md
+docs/memory/
+
 
 # Project Rules
 
@@ -262,3 +266,6 @@ outputs/
 # Credentials (Policy Rules): Never commit
 kaggle.json
 *.key
+
+# Reference papers: keep PDFs local, commit notes and links only
+docs/reference/*.pdf

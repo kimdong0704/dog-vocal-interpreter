@@ -1,0 +1,38 @@
+# Pipeline settings. The app reads only this file.
+# Notebooks decide the values; null means "not decided yet".
+
+# Shared media settings (decided in notebook 10).
+media:
+  sample_rate: 16000
+  frames_per_segment: 4
+
+# Bark detector (decided in notebook 10).
+bark_detector:
+  model: null
+  threshold: null
+
+branches:
+  # Audio branch (decided in notebooks 20 and 21).
+  audio:
+    encoder: null
+    head: null
+
+  # Body-language branch (decided in notebooks 30 and 31).
+  body:
+    detector: null
+    pose: null
+    head: null
+
+  # Scene-context branch (decided in notebook 40).
+  scene:
+    model: null
+    prompts: null
+
+# Fusion of branch outputs (decided in notebook 50).
+fusion:
+  method: weighted_average
+  weights:
+    audio: 0.34
+    body: 0.33
+    scene: 0.33
+  temperature: 1.0
