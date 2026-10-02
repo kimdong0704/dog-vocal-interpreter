@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "woofdecoder"
+version = "0.1.0"
+description = "Multimodal dog vocalization interpreter: audio + body language + scene context"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy",
+    "pandas",
+    "pyyaml",
+    "soundfile",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+ml = ["torch", "transformers", "huggingface_hub", "librosa", "scikit-learn"]
+app = ["fastapi", "uvicorn[standard]", "python-multipart", "gradio"]
+dev = ["pytest", "ruff", "ipykernel", "nbstripout", "matplotlib"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
