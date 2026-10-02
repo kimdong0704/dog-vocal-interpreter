@@ -29,7 +29,7 @@ class UniformBranch(Branch):
 
 
 def test_taxonomy_is_consistent() -> None:
-    """There are 9 unique subtypes, and every label has a display name."""
+    """Tests: All subtypes and categories have a display name."""
     assert NUM_SUBTYPES == 9
     assert len(SUBTYPES) == len(set(SUBTYPES))
 
@@ -40,7 +40,7 @@ def test_taxonomy_is_consistent() -> None:
 
 
 def test_category_probs_sum_to_one() -> None:
-    """Category probabilities built from valid subtype probabilities sum to 1."""
+    """Tests: Category probabilities built from valid subtype probabilities sum to 1."""
     random_generator = np.random.default_rng(seed=0)
     subtype_probs = random_generator.dirichlet(np.ones(NUM_SUBTYPES))
 
@@ -50,7 +50,7 @@ def test_category_probs_sum_to_one() -> None:
 
 
 def test_branch_contract() -> None:
-    """A Branch returns a valid present output, and missing() is not present."""
+    """Test: A Branch returns a valid present output, and missing() is not present."""
     segment = BarkSegment(start_s=0.0, end_s=1.0)
 
     output = UniformBranch().predict(segment)
@@ -61,13 +61,13 @@ def test_branch_contract() -> None:
 
 
 def test_branch_output_rejects_bad_probs() -> None:
-    """Probabilities that do not sum to 1 raise ValueError."""
+    """Test: BranchOutput rejects probabilities that do not sum to 1."""
     with pytest.raises(ValueError):
         BranchOutput(probs=np.ones(NUM_SUBTYPES))
 
 
 def test_config_loads() -> None:
-    """The default config file loads and has the main sections."""
+    """Test: The default config file loads and has the main sections."""
     config = load_config()
 
     assert "bark_detector" in config
