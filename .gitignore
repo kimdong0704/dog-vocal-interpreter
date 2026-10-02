@@ -216,3 +216,49 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# Project Rules
+
+# Data: never commit datasets, clips, or self-collected media
+data/*
+!data/.gitkeep
+# Shared, reproducible split definitions ARE committed
+!data/splits/
+# YouTube clip list (IDs + timestamps only, no media) IS committed
+!data/youtube/
+data/youtube/*
+!data/youtube/ids.csv
+
+# Trained models and downloaded weights
+models/*
+!models/.gitkeep
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+
+# Media and archives anywhere in the repo
+*.wav
+*.mp3
+*.flac
+*.mp4
+*.mov
+*.avi
+*.zip
+*.tar
+*.tar.gz
+*.parquet
+
+# Smoke tests (small clips): exception
+!tests/fixtures/**
+
+# Experiment tracking
+wandb/
+mlruns/
+outputs/
+
+# Credentials (Policy Rules): Never commit
+kaggle.json
+*.key
