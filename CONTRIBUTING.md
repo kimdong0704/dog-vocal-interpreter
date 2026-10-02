@@ -8,11 +8,23 @@
 For every task:
 
 1. **Update `main`.** In GitHub Desktop: switch to `main`, then *Fetch origin* → *Pull origin*.
-2. **Create a branch** from `main` (*Branch → New branch*). Name it by type:
-   - `feature/...` new functionality (`feature/bark-detector`)
-   - `fix/...` bug fixes (`fix/segment-off-by-one`)
-   - `exp/...` experiments and notebooks (`exp/audio-linear-probe`)
-   - `docs/...` documentation (`docs/readme-setup`)
+2. **Create a branch** from `main` (*Branch → New branch*). Name it `<type>/<short-description>`:
+
+   | Prefix | Use for | Example |
+   |---|---|---|
+   | `feature/` | New code or functionality | `feature/bark-detector` |
+   | `fix/` | Bug fixes | `fix/segment-off-by-one` |
+   | `exp/` | Experiments and notebooks (may never merge) | `exp/audio-linear-probe` |
+   | `docs/` | Documentation | `docs/readme-setup` |
+   | `chore/` | Setup, config, dependencies, cleanup | `chore/add-github-actions` |
+   | `refactor/` | Restructuring code without changing behavior | `refactor/split-scene-branch` |
+   | `test/` | Adding or fixing tests only | `test/taxonomy-category-probs` |
+
+   Naming rules:
+   - Lowercase letters, numbers and hyphens only: no spaces, capitals or underscores.
+   - 2–5 words describing *what* the branch does.
+   - If the task has a GitHub Issue, put its number first: `feature/12-bark-detector`.
+   - One branch per task. Avoid vague names like `test`, `update` or `leo-stuff`.
 3. **Commit and push** to your branch as often as you like.
 4. **Before opening a pull request**, run:
 ```bash
