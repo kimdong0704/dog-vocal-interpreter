@@ -20,6 +20,7 @@ dependencies = [
 ml = ["torch", "transformers", "huggingface_hub", "librosa", "scikit-learn"]
 app = ["fastapi", "uvicorn[standard]", "python-multipart", "gradio"]
 dev = ["pytest", "ruff", "ipykernel", "nbstripout", "matplotlib"]
+data = ["huggingface_hub", "requests", "python-dotenv"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

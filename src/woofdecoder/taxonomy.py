@@ -66,12 +66,12 @@ def category_probs(subtype_probs: np.ndarray) -> dict[str, float]:
 
     result: dict[str, float] = {}
     for category_name, subtype_names in CATEGORIES.items():
-        category_total = 0.
-        
+        category_total = 0.0
+
         for subtype_name in subtype_names:
             position = SUBTYPE_INDEX[subtype_name]
             category_total += subtype_probs[position]
-            
+
         result[category_name] = float(category_total)
 
     return result
