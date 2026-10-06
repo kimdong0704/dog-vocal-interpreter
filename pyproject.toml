@@ -14,14 +14,13 @@ dependencies = [
     "pyyaml",
     "soundfile",
     "tqdm",
+    "dataset-downloader @ git+https://github.com/kimdong0704/dataset-downloader.git@v0.1.0",
 ]
 
 [project.optional-dependencies]
 ml = ["torch", "transformers", "huggingface_hub", "librosa", "scikit-learn"]
 app = ["fastapi", "uvicorn[standard]", "python-multipart", "gradio"]
 dev = ["pytest", "ruff", "ipykernel", "nbstripout", "matplotlib"]
-data = ["huggingface_hub", "requests", "python-dotenv"]
-
 [tool.setuptools.packages.find]
 where = ["src"]
 

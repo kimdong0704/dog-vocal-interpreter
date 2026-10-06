@@ -14,28 +14,33 @@ DATA_DIR_ENV_VAR: str = "WOOFDECODER_DATA_DIR"
 ENV_FILE: Path = REPO_ROOT / ".env"
 
 
-def load_env_file(path: Path | None = None) -> bool:
-    """Load tokens and settings from a .env file into the environment.
+def load_data_dir_from_env_file(path: Path | None = None) -> bool:
+    """Set WOOFDECODER_DATA_DIR from the .env file, unless the terminal already set it.
 
-    The .env file holds personal values (HF_TOKEN, WOOFDECODER_DATA_DIR, ...) and is
-    never committed; see .env.example. Variables already set in the environment win,
-    so a value set in the terminal always overrides the file.
+    Only this one entry is read. The tokens in .env are read by dataset-downloader itself
+    and never put into the environment, so other programs started from here cannot see them.
 
     Args:
         path: The .env file to read. Defaults to ENV_FILE (<repo root>/.env).
 
     Returns:
-        True if the file existed and was loaded, False if there is no file.
+        True if WOOFDECODER_DATA_DIR was set from the file, False otherwise.
     """
-    # Imported here because python-dotenv is in the "data" extra, not the base install.
-    from dotenv import load_dotenv
-
     if path is None:
         path = ENV_FILE
-    if not path.exists():
+    if DATA_DIR_ENV_VAR in os.environ or not path.exists():
         return False
 
-    return load_dotenv(path, override=False)
+    for line in path.read_text(encoding="utf-8").splitlines():
+        key, _, value = line.partition("=")
+        if key.strip() != DATA_DIR_ENV_VAR:
+            continue
+        data_dir = value.strip().strip("\"'")
+        if not data_dir:
+            return False
+        os.environ[DATA_DIR_ENV_VAR] = data_dir
+        return True
+    return False
 
 
 def get_data_dir() -> Path:

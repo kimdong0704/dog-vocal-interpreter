@@ -1,0 +1,46 @@
+# Raw datasets for: python -m woofdecoder.data.download [id ...]
+# Each dataset uses either `link` (+ optional patterns, revision), passed to Downloader.add,
+# or `provider` + `args`, passed to that Downloader method. Files go to <data_dir>/raw/<id>/.
+
+datasets:
+  - id: playpant
+    name: "PlayPanT: dog play-session audio recordings with annotations"
+    link: https://zenodo.org/records/18972388
+    # "02 Raw recordings.zip" (43.4 GB) is left out: large and not needed.
+    patterns: ["03 *", "04 *", "05 *", "06 *"]
+
+  - id: act_env
+    name: "Barkopedia: dog barks labeled by activity and environment"
+    link: https://huggingface.co/datasets/ArlingtonCL2/Barkopedia_Dog_Act_Env
+    revision: 60a721a7f9477634971f6b3df29dc2a5e56994d8
+    patterns: ["train/*", "validation/*", "README.md"]
+
+  - id: emotional_canines
+    name: "Barkopedia: dog vocalizations labeled by emotion"
+    link: https://huggingface.co/datasets/ArlingtonCL2/BarkopediaDogEmotionClassification_Data
+    revision: c0617b15562882b9eee4cc1bcb8e6aa80e51bd34
+
+  - id: audioset_strong_eval
+    name: "AudioSet strong labels (animal sounds), eval split mirror"
+    link: https://huggingface.co/datasets/enyoukai/AudioSet-Strong-Animals
+    revision: 804fa9ccfa8251edb08c5721471bdde9638adc62
+    patterns: ["data/eval-*.parquet", "README.md"]
+
+  - id: dog_pose
+    name: "Ultralytics Dog-Pose: dog images with keypoints (YOLO format)"
+    # A plain url call, so the known md5 is still checked (GitHub has no digest for this asset).
+    provider: url
+    args:
+      url: https://github.com/ultralytics/assets/releases/download/v0.0.0/dog-pose.zip
+      size: 353152125
+      md5: 7169e61b3c2d267c6105446f391d16cd
+
+  - id: dogposecv
+    name: "Dog pose classification images (standing, sitting, lying, ...)"
+    link: https://huggingface.co/datasets/stockeh/dog-pose-cv
+    revision: 5c57f03beba003aa658e7d17891470e0ee5b8c8d
+
+  - id: stanford_dogs
+    name: "Stanford Dogs: 120 breeds, images and train/test lists"
+    link: http://vision.stanford.edu/aditya86/ImageNetDogs/main.html
+    patterns: ["images.tar", "lists.tar"]
