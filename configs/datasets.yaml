@@ -1,0 +1,85 @@
+# Raw datasets for: python -m woofdecoder.data.download [id]
+# No id downloads everything; an id downloads only that dataset
+# Files go to<data_dir>/raw/<id>/
+# Grouped by pipeline stage
+# Sizes are approximately total = 8 GB
+
+datasets:
+  # --- Audio ---
+  # Bark detector: validation (strong labels) and audio branch val/test (play).
+  - id: playpant
+    name: "PlayPanT: dog play-session audio recordings with annotations"
+    link: https://zenodo.org/records/18972388
+    # "02 Raw recordings.zip" (43.4 GB) is left out: large and not needed.
+    patterns: ["03 *", "04 *", "05 *", "06 *"]          # ≈ 0.38 GB
+
+  # Bark detector: secondary validation (optimistic: the detector was trained on AudioSet).
+  - id: audioset_strong_eval
+    name: "AudioSet strong labels (animal sounds), eval split mirror"
+    link: https://huggingface.co/datasets/enyoukai/AudioSet-Strong-Animals
+    revision: 804fa9ccfa8251edb08c5721471bdde9638adc62
+    patterns: ["data/eval-*.parquet", "README.md"]       # ≈ 3.0 GB
+
+  # Bark detector: false-alarm negatives; audio branch: noise for augmentation.
+  - id: esc50
+    name: "ESC-50 environmental sounds (negatives and noise for augmentation)"
+    provider: url
+    args:
+      url: https://github.com/karolpiczak/ESC-50/archive/33c8ce9eb2cf0b1c2f8bcf322eb349b6be34dbb6.zip
+      path: ESC-50.zip                                   # ≈ 0.6 GB
+
+  # Audio branch: training (situation labels for 4 of the 9 subtypes).
+  - id: act_env
+    name: "Barkopedia: dog barks labeled by activity and environment"
+    link: https://huggingface.co/datasets/ArlingtonCL2/Barkopedia_Dog_Act_Env
+    revision: 60a721a7f9477634971f6b3df29dc2a5e56994d8
+    patterns: ["train/*", "validation/*", "README.md"]   # ≈ 0.61 GB
+
+  # Audio branch: emotion head (train + dog-disjoint validation).
+  - id: emotional_canines
+    name: "Barkopedia: dog vocalizations labeled by emotion"
+    link: https://huggingface.co/datasets/ArlingtonCL2/BarkopediaDogEmotionClassification_Data
+    revision: c0617b15562882b9eee4cc1bcb8e6aa80e51bd34   # ≈ 0.07 GB
+
+  # --- Vision: pose ---
+  # Pose: images for StanfordExtra labels.
+  - id: stanford_dogs
+    name: "Stanford Dogs: 120 breeds, images and train/test lists"
+    link: http://vision.stanford.edu/aditya86/ImageNetDogs/main.html
+    patterns: ["images.tar", "lists.tar"]                # ≈ 0.76 GB
+
+  # Pose: final keypoint labels (MIT) with official train/val/test splits. Needs Kaggle keys.
+  - id: stanfordextra
+    name: "StanfordExtra dog keypoints (Kaggle mirror of the MIT labels)"
+    provider: kaggle
+    args:
+      dataset: sachadee/stanford-dogs-dataset-for-animal-pose-estimation
+      version: 1                                         # ≈ 0.02 GB
+
+  # Pose: day-1 baseline (images + YOLO keypoints in one file).
+  - id: dog_pose
+    name: "Ultralytics Dog-Pose: dog images with keypoints (YOLO format)"
+    # A plain url call, so the known md5 is still checked (GitHub has no digest for this asset).
+    provider: url
+    args:
+      url: https://github.com/ultralytics/assets/releases/download/v0.0.0/dog-pose.zip
+      size: 353152125
+      md5: 7169e61b3c2d267c6105446f391d16cd               # ≈ 0.35 GB
+
+  # --- Vision: posture ---
+  # Body-language branch: posture head (standing / sitting / lying).
+  - id: dogposecv
+    name: "Dog pose classification images (standing, sitting, lying, ...)"
+    link: https://huggingface.co/datasets/stockeh/dog-pose-cv
+    revision: 5c57f03beba003aa658e7d17891470e0ee5b8c8d   # ≈ 0.82 GB
+
+  # --- Scene ---
+  # Scene branch: leash evaluation (classes dog, leash, person). Needs a Roboflow key.
+  - id: rf_leash
+    name: "Roboflow ai-stray-dog-project v1 (leash boxes)"
+    link: https://universe.roboflow.com/rusydan/ai-stray-dog-project/dataset/1
+
+  # Scene branch: bowl evaluation (classes cat, dog, bowl). Needs a Roboflow key.
+  - id: rf_bowl
+    name: "Roboflow cat-dog-bowl v20 (bowl boxes)"
+    link: https://universe.roboflow.com/eyedetection-s8fd9/cat-dog-bowl-ncx2x/dataset/20
