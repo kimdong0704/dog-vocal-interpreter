@@ -18,6 +18,7 @@ from woofdecoder.data.prepare import (
     emotional_canines,
     esc50,
     playpant,
+    roboflow,
     stanford_dogs,
     stanfordextra,
 )
@@ -37,4 +38,6 @@ CONVERTERS: dict[str, Converter] = {
     "stanfordextra": stanfordextra.prepare,
     "dog_pose": dog_pose.prepare,
     "dogposecv": dogposecv.prepare,
+    "rf_leash": roboflow.prepare_rf_leash,
+    "rf_bowl": roboflow.prepare_rf_bowl,
 }

@@ -7,7 +7,6 @@ split from the sha1 of its image key, the same on every machine.
 
 from __future__ import annotations
 
-import hashlib
 import io
 import json
 import zipfile
@@ -18,6 +17,7 @@ import numpy as np
 
 from woofdecoder.data.fileio import read_csv
 from woofdecoder.data.manifest import processed_dir
+from woofdecoder.data.prepare.common import split_from_hash
 
 STANFORD_DOGS: str = "stanford_dogs"
 INDEX_FILENAME: str = "index.csv"
@@ -33,7 +33,6 @@ STANFORDEXTRA_SPLIT_FILES: dict[str, str] = {
 }
 
 # Images outside StanfordExtra: sha1(image key) mod 100 below these bounds -> the split.
-HASH_BUCKETS: int = 100
 TRAIN_BELOW: int = 70
 VAL_BELOW: int = 85
 
@@ -45,12 +44,7 @@ def image_key(path: str) -> str:
 
 def hash_split(key: str) -> str:
     """Return train / val / test from sha1(key) mod 100 (<70 train, <85 val, else test)."""
-    bucket = int(hashlib.sha1(key.encode("utf-8")).hexdigest(), 16) % HASH_BUCKETS
-    if bucket < TRAIN_BELOW:
-        return "train"
-    if bucket < VAL_BELOW:
-        return "val"
-    return "test"
+    return split_from_hash(key, TRAIN_BELOW, VAL_BELOW)
 
 
 def shared_split(key: str, official_splits: dict[str, str]) -> str:

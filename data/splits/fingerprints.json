@@ -43,6 +43,18 @@
   "rows": 760,
   "sha1": "190c680a3440c7c013874bd02e44bd009292a49e"
  },
+ "rf_bowl": {
+  "files": 5026,
+  "labels_sha1": "78cb4a4d792d5d83c7a7471f6e816fe1bf1747e8",
+  "rows": 5021,
+  "sha1": "9748e42c8f42ca5957a8af88da55f853cf606b67"
+ },
+ "rf_leash": {
+  "files": 9359,
+  "labels_sha1": "659c2814a28d4c6b47e11f503daae517449b3a40",
+  "rows": 9354,
+  "sha1": "8ec97c95c15278fa705d96f63964ab6dd22801f0"
+ },
  "stanford_dogs": {
   "boxes_sha1": "0c10e17422231efffbaede362f0bddd0295221d6",
   "files": 20583,
