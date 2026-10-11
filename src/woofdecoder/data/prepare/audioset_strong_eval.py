@@ -26,6 +26,7 @@ from woofdecoder.data.prepare.common import (
     make_windows,
     save_frame_targets,
     write_events,
+    write_labels,
     write_sed_classes,
 )
 from woofdecoder.sed_classes import AUDIOSET_TO_SED, SED_CLASSES
@@ -45,6 +46,7 @@ NOTES: str = (
 )
 # AudioSet "Pant" is human breathing, so dog panting is never labelled here.
 UNLABELLED_CLASSES: tuple[str, ...] = ("pant",)
+LABEL_COLUMNS: list[str] = ["clip_id", "video_id", "labels", "human_labels"]
 
 
 def has_dog_event(events: list[dict[str, Any]]) -> bool:
@@ -88,6 +90,16 @@ def clip_event_rows(clip_id: str, events: list[dict[str, Any]]) -> list[dict[str
             }
         )
     return event_rows
+
+
+def clip_label_row(clip_id: str, row: dict[str, Any]) -> dict[str, str]:
+    """Return one labels.csv row: the clip's weak (clip-level) labels, ";"-joined."""
+    return {
+        "clip_id": clip_id,
+        "video_id": row["video_id"],
+        "labels": ";".join(row["labels"]),
+        "human_labels": ";".join(row["human_labels"]),
+    }
 
 
 def dog_event_names(events: list[dict[str, Any]]) -> str:
@@ -163,9 +175,10 @@ def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
 
     rows: list[ManifestRow] = []
     event_rows: list[dict[str, Any]] = []
+    label_rows: list[dict[str, str]] = []
     for parquet_path in parquet_paths:
         parquet_file = pq.ParquetFile(parquet_path)
-        columns = ["video_id", "audio", "events"]
+        columns = ["video_id", "audio", "labels", "human_labels", "events"]
         for batch in parquet_file.iter_batches(batch_size=BATCH_ROWS, columns=columns):
             for row in batch.to_pylist():
                 if row["video_id"] not in kept_ids:
@@ -173,8 +186,10 @@ def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
                 manifest_row, clip_events = convert_clip(row, out_dir, source_version)
                 rows.append(manifest_row)
                 event_rows.extend(clip_events)
+                label_rows.append(clip_label_row(manifest_row.clip_id, row))
 
     write_events(out_dir, event_rows)
+    write_labels(out_dir, label_rows, LABEL_COLUMNS)
     labelled_classes: list[str] = []
     for class_name in SED_CLASSES:
         if class_name not in UNLABELLED_CLASSES:

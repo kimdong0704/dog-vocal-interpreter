@@ -11,8 +11,15 @@ import pandas as pd
 import pytest
 import soundfile
 
-from woofdecoder.data.prepare import audioset_strong_eval, esc50, playpant
+from woofdecoder.data.prepare import (
+    act_env,
+    audioset_strong_eval,
+    emotional_canines,
+    esc50,
+    playpant,
+)
 from woofdecoder.sed_classes import AUDIOSET_TO_SED, PLAYPANT_TO_SED, SED_CLASSES
+from woofdecoder.taxonomy import SUBTYPES
 
 TONE_RATE: int = 44_100
 LAYER1_HEADER: str = "Selection\tView\tChannel\tBegin Time (s)\tEnd Time (s)\tAnnotation\n"
@@ -253,3 +260,92 @@ def test_esc50_clip_row(
         assert np.load(tmp_path / "data" / row.target_path).sum() == 0
     else:
         assert row.notes == "clip-level dog label, no frame targets"
+
+
+# --- Act_Env ---
+
+
+def test_act_env_activity_mapping() -> None:
+    """Test: Activities map to taxonomy subtypes as agreed; rest and shower map to none."""
+    assert act_env.ACTIVITY_TO_SUBTYPE == {
+        "alerting to sounds": "stranger_alert",
+        "begging for food": "demand",
+        "seeking attention": "interaction",
+        "playing with human": "play",
+        "playing with other animals": "play",
+        "playing with toy": "play",
+        "rest": "",
+        "taking shower": "",
+    }
+    for subtype in act_env.ACTIVITY_TO_SUBTYPE.values():
+        assert subtype == "" or subtype in SUBTYPES
+
+
+def test_act_env_unknown_activity_stops() -> None:
+    """Test: Case and surrounding spaces are ignored; an unknown value raises with its count."""
+    known = [{"activity": "rest"}, {"activity": "Rest "}, {"activity": "Playing with Human"}]
+    unknown = known + [{"activity": "sleeping"}, {"activity": "sleeping"}]
+
+    act_env.check_activities(known)
+    with pytest.raises(ValueError, match="'sleeping': 2"):
+        act_env.check_activities(unknown)
+    assert act_env.normalize_label(" Indoor (General) ") == "indoor (general)"
+
+
+def test_act_env_row_keeps_raw_label(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Test: A capitalised activity maps to its subtype; original_label keeps the raw text."""
+    out_dir = processed_source_dir(monkeypatch, tmp_path, "act_env")
+    clip = {
+        "clip_id": "act_env/validation/audio_00000.wav",
+        "audio_id": "audio_00000",
+        "activity": "Playing with Human",
+        "original_split": "validation",
+    }
+
+    row = act_env.make_row(clip, out_dir, 2.5, "rev")
+
+    assert row.mapped_subtype == "play"
+    assert row.original_label == "Playing with Human"
+    assert row.split == "train_only"
+    assert row.eval_allowed is False
+    assert row.file_path == "processed/act_env/audio/validation/audio_00000.wav"
+
+
+# --- EmotionalCanines ---
+
+
+def make_emotional_canines_raw(raw_dir: Path) -> None:
+    """Write one labelled clip per breed in train and validation, and unlabelled test clips."""
+    for folder in ("train", "validation", "test"):
+        for breed in ("husky", "shiba"):
+            audio_dir = raw_dir / folder / breed
+            audio_dir.mkdir(parents=True)
+            audio_id = f"{breed}_{folder}_00000"
+            (audio_dir / f"{audio_id}.wav").write_bytes(tone_bytes(1.0, "WAV"))
+            if folder != "test":
+                labels = f"audio_id,arousal,valence\n{audio_id},High,Positive\n"
+                (raw_dir / f"{breed}_{folder}_labels.csv").write_text(labels, encoding="utf-8")
+
+
+def test_emotional_canines_splits(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Test: train -> train_only (not evaluated), validation -> val, test is skipped."""
+    out_dir = processed_source_dir(monkeypatch, tmp_path, "emotional_canines")
+    raw_dir = tmp_path / "data" / "raw" / "emotional_canines"
+    make_emotional_canines_raw(raw_dir)
+
+    rows = emotional_canines.prepare(raw_dir, out_dir)
+
+    splits_and_eval: list[tuple[str, str, bool]] = []
+    for row in rows:
+        splits_and_eval.append((row.clip_id, row.split, row.eval_allowed))
+    assert sorted(splits_and_eval) == [
+        ("emotional_canines/train/husky/husky_train_00000.wav", "train_only", False),
+        ("emotional_canines/train/shiba/shiba_train_00000.wav", "train_only", False),
+        ("emotional_canines/validation/husky/husky_validation_00000.wav", "val", True),
+        ("emotional_canines/validation/shiba/shiba_validation_00000.wav", "val", True),
+    ]
+    assert rows[0].original_label == "High/Positive"
+    assert rows[0].leakage_group == "barkopedia_pool"
+    labels = pd.read_csv(out_dir / "labels.csv")
+    assert list(labels.columns) == emotional_canines.LABEL_COLUMNS
+    assert len(labels) == 4

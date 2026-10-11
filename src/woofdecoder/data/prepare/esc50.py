@@ -23,6 +23,7 @@ from woofdecoder.data.prepare.common import (
     make_windows,
     save_frame_targets,
     write_events,
+    write_labels,
     write_sed_classes,
 )
 from woofdecoder.sed_classes import SED_CLASSES
@@ -139,6 +140,7 @@ def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
     """Convert ESC-50.zip into WAVs, negative targets, events.csv (empty) and rows."""
     archive_path = raw_dir / ARCHIVE_FILENAME
     rows: list[ManifestRow] = []
+    label_rows: list[dict[str, str]] = []
     with tempfile.TemporaryDirectory() as extract_dir:
         metadata_path = extract_members(archive_path, METADATA_PATTERN, Path(extract_dir))[0]
         audio_paths = extract_members(archive_path, AUDIO_PATTERN, Path(extract_dir))
@@ -146,7 +148,8 @@ def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
         for audio_path in audio_paths:
             audio_by_name[audio_path.name] = audio_path
 
-        clips = read_csv(metadata_path).to_dict("records")
+        metadata = read_csv(metadata_path)
+        clips = metadata.to_dict("records")
         lowest_fold = lowest_fold_by_source(clips)
         source_version = archive_commit(SOURCE)
         moved_count = 0
@@ -157,10 +160,13 @@ def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
             if split != clip_split(clip["fold"]):
                 moved_count += 1
             audio_path = audio_by_name[clip["filename"]]
-            rows.append(convert_clip(clip, audio_path, out_dir, split, source_version))
+            row = convert_clip(clip, audio_path, out_dir, split, source_version)
+            rows.append(row)
+            label_rows.append({"clip_id": row.clip_id} | clip)
     print(f"  {moved_count} clips follow their source's lowest fold into another split")
 
     write_events(out_dir, [])  # no clip has time-stamped events
+    write_labels(out_dir, label_rows, ["clip_id"] + list(metadata.columns))
     write_sed_classes(out_dir, SED_CLASSES)  # negatives: every class is known to be absent
     print_report(rows)
     return rows

@@ -304,6 +304,25 @@ def test_fingerprint_changes_only_when_a_label_changes(tmp_path: Path) -> None:
     assert changed["sha1"] != first["sha1"]
 
 
+@pytest.mark.parametrize("filename", ["events.csv", "labels.csv"])
+def test_fingerprint_changes_when_one_text_row_changes(tmp_path: Path, filename: str) -> None:
+    """Test: One changed events.csv or labels.csv row changes the fingerprint; order does not."""
+    write_source_rows("esc50", [make_row("a.wav", "train")], tmp_path)
+    text_path = tmp_path / "processed" / "esc50" / filename
+    text_path.write_text("clip_id,label\nesc50/a.wav,x\nesc50/b.wav,y\n", encoding="utf-8")
+    first = fingerprint_source("esc50", tmp_path)
+
+    text_path.write_text("clip_id,label\nesc50/b.wav,y\nesc50/a.wav,x\n", encoding="utf-8")
+    reordered = fingerprint_source("esc50", tmp_path)
+    text_path.write_text("clip_id,label\nesc50/a.wav,x\nesc50/b.wav,z\n", encoding="utf-8")
+    changed = fingerprint_source("esc50", tmp_path)
+
+    key = filename.replace(".csv", "_sha1")
+    assert reordered == first
+    assert changed[key] != first[key]
+    assert changed["sha1"] == first["sha1"]
+
+
 # --- Prepare runner ---
 
 

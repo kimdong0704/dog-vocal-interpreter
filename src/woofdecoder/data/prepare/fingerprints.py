@@ -1,8 +1,10 @@
 """Fingerprints of each prepared source, committed so teammates can confirm identical data.
 
-A fingerprint is the number of rows, the number of files in processed/<source>/, and a
-sha1 of the sorted (clip_id, split, mapped_subtype) list. It does not hash audio or image
-bytes, so tiny resampling differences between machines do not count as a mismatch.
+A fingerprint is the number of rows, the number of files in processed/<source>/, a sha1
+of the sorted (clip_id, split, mapped_subtype) list, and a sha1 of the sorted text rows of
+events.csv and labels.csv where the source has them (so changed events, which drive the
+frame targets, and changed labels show). It does not hash audio, image or .npy bytes, so
+tiny resampling differences between machines do not count as a mismatch.
 """
 
 from __future__ import annotations
@@ -16,10 +18,13 @@ from woofdecoder.data import splits
 from woofdecoder.data.download import load_datasets
 from woofdecoder.data.fileio import read_csv, write_json
 from woofdecoder.data.manifest import ROWS_FILENAME, processed_dir
+from woofdecoder.data.prepare.common import EVENTS_FILENAME, LABELS_FILENAME
 from woofdecoder.data.status import folder_stats
 
 FINGERPRINTS_FILENAME: str = "fingerprints.json"
 FINGERPRINT_COLUMNS: list[str] = ["clip_id", "split", "mapped_subtype"]
+# Optional per-source text files hashed into the fingerprint (key -> file name).
+HASHED_FILES: dict[str, str] = {"events_sha1": EVENTS_FILENAME, "labels_sha1": LABELS_FILENAME}
 
 
 def fingerprints_path(splits_dir: Path | None = None) -> Path:
@@ -29,18 +34,31 @@ def fingerprints_path(splits_dir: Path | None = None) -> Path:
     return splits_dir / FINGERPRINTS_FILENAME
 
 
+def sorted_lines_sha1(lines: list[str]) -> str:
+    """Return the sha1 of lines after sorting them (so row order does not matter)."""
+    return hashlib.sha1("\n".join(sorted(lines)).encode("utf-8")).hexdigest()
+
+
 def fingerprint_source(source: str, data_dir: Path | None = None) -> dict[str, Any]:
-    """Return {"rows", "files", "sha1"} for processed/<source>/, read back from rows.csv."""
+    """Return {"rows", "files", "sha1"} (+ "events_sha1", "labels_sha1" when those files
+    exist) for processed/<source>/, read back from its files."""
     source_dir = processed_dir(data_dir) / source
     rows = read_csv(source_dir / ROWS_FILENAME)
 
     lines: list[str] = []
     for clip_id, split, mapped_subtype in rows[FINGERPRINT_COLUMNS].itertuples(index=False):
         lines.append(f"{clip_id}\t{split}\t{mapped_subtype}")
-    lines.sort()
-    digest = hashlib.sha1("\n".join(lines).encode("utf-8")).hexdigest()
 
-    return {"rows": len(rows), "files": folder_stats(source_dir).file_count, "sha1": digest}
+    fingerprint: dict[str, Any] = {
+        "rows": len(rows),
+        "files": folder_stats(source_dir).file_count,
+        "sha1": sorted_lines_sha1(lines),
+    }
+    for key, filename in HASHED_FILES.items():
+        if (source_dir / filename).is_file():
+            file_lines = (source_dir / filename).read_text(encoding="utf-8").splitlines()
+            fingerprint[key] = sorted_lines_sha1(file_lines)
+    return fingerprint
 
 
 def load_fingerprints(splits_dir: Path | None = None) -> dict[str, dict[str, Any]]:
@@ -87,13 +105,17 @@ def record_fingerprint(
 
 
 def describe_difference(expected: dict[str, Any], actual: dict[str, Any]) -> str:
-    """Return e.g. "rows 120 -> 118, files 10 -> 10, sha1 differs" for two fingerprints."""
+    """Return e.g. "rows 120 -> 118, files 10 -> 10, sha1 differs (...)" for two fingerprints."""
     differences: list[str] = []
     for key in ("rows", "files"):
         differences.append(f"{key} {expected[key]} -> {actual[key]}")
-    if expected["sha1"] != actual["sha1"]:
-        differences.append("sha1 differs (clip ids, splits or labels)")
-    else:
+    meanings = {"sha1": "clip ids, splits or labels"} | HASHED_FILES
+    any_sha1_differs = False
+    for key, meaning in meanings.items():
+        if expected.get(key) != actual.get(key):
+            differences.append(f"{key} differs ({meaning})")
+            any_sha1_differs = True
+    if not any_sha1_differs:
         differences.append("sha1 same")
     return ", ".join(differences)
 

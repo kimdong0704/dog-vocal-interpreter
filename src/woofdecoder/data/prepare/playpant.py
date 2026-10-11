@@ -38,6 +38,7 @@ from woofdecoder.data.prepare.common import (
     open_member,
     save_frame_targets,
     write_events,
+    write_labels,
     write_sed_classes,
 )
 from woofdecoder.sed_classes import PLAYPANT_TO_SED, SED_CLASSES
@@ -100,13 +101,24 @@ def session_members(member_names: list[str], suffix: str) -> dict[str, str]:
     return members
 
 
-def read_metadata(path: Path) -> dict[str, str]:
-    """Return {session id: dog id} from 05 Metadata.csv."""
+def read_metadata(path: Path) -> dict[str, dict[str, str]]:
+    """Return {session id: its 05 Metadata.csv row, every column as text}."""
     metadata = pd.read_csv(path, sep=METADATA_SEPARATOR, dtype=str, keep_default_na=False)
-    dog_by_session: dict[str, str] = {}
-    for audio_file, dog_id in zip(metadata["Audio_file"], metadata["ID_dog"], strict=True):
-        dog_by_session[audio_file.removesuffix(RECORDING_SUFFIX)] = dog_id
-    return dog_by_session
+    metadata_by_session: dict[str, dict[str, str]] = {}
+    for record in metadata.to_dict("records"):
+        metadata_by_session[record["Audio_file"].removesuffix(RECORDING_SUFFIX)] = record
+    return metadata_by_session
+
+
+def window_label_rows(
+    rows: list[ManifestRow], metadata_by_session: dict[str, dict[str, str]]
+) -> list[dict[str, str]]:
+    """Return one labels.csv row per window: clip_id plus its session's metadata columns."""
+    label_rows: list[dict[str, str]] = []
+    for row in rows:
+        session = PurePosixPath(row.file_path).stem
+        label_rows.append({"clip_id": row.clip_id} | metadata_by_session[session])
+    return label_rows
 
 
 def assign_dog_splits(dog_ids: list[str]) -> dict[str, str]:
@@ -128,7 +140,7 @@ def assign_dog_splits(dog_ids: list[str]) -> dict[str, str]:
 def matched_sessions(
     recordings: dict[str, str],
     annotations: set[str],
-    dog_by_session: dict[str, str],
+    metadata_by_session: dict[str, dict[str, str]],
 ) -> list[str]:
     """Return the sorted sessions that have a recording, annotations and a metadata row.
 
@@ -138,12 +150,12 @@ def matched_sessions(
         print(f"  recording without annotations: {session}")
     for session in sorted(annotations - set(recordings)):
         print(f"  annotations without a recording: {session}")
-    for session in sorted(set(recordings) - set(dog_by_session)):
+    for session in sorted(set(recordings) - set(metadata_by_session)):
         print(f"  recording without a metadata row: {session}")
 
     sessions: list[str] = []
     for session in sorted(recordings):
-        if session in annotations and session in dog_by_session:
+        if session in annotations and session in metadata_by_session:
             sessions.append(session)
     return sessions
 
@@ -311,7 +323,10 @@ def print_dog_splits(split_by_dog: dict[str, str]) -> None:
 
 def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
     """Convert raw/playpant/ into session WAVs, window targets, events.csv and rows."""
-    dog_by_session = read_metadata(raw_dir / METADATA_FILENAME)
+    metadata_by_session = read_metadata(raw_dir / METADATA_FILENAME)
+    dog_by_session: dict[str, str] = {}
+    for session, record in metadata_by_session.items():
+        dog_by_session[session] = record["ID_dog"]
     dog_ids = sorted(set(dog_by_session.values()))
     print(f"  metadata: {len(dog_by_session)} rows, dog ids {', '.join(dog_ids)}")
     split_by_dog = assign_dog_splits(dog_ids)
@@ -324,7 +339,7 @@ def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
     layer1_members = session_members(annotation_names, LAYER1_SUFFIX)
     layer2_members = session_members(annotation_names, LAYER2_SUFFIX)
     annotated = set(layer1_members) | set(layer2_members)
-    sessions = matched_sessions(recordings, annotated, dog_by_session)
+    sessions = matched_sessions(recordings, annotated, metadata_by_session)
 
     rows: list[ManifestRow] = []
     event_rows: list[dict[str, Any]] = []
@@ -351,6 +366,10 @@ def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
             layers[session] = layer
 
     write_events(out_dir, event_rows)
+    metadata_columns = list(next(iter(metadata_by_session.values())))
+    write_labels(
+        out_dir, window_label_rows(rows, metadata_by_session), ["clip_id"] + metadata_columns
+    )
     write_sed_classes(out_dir, SED_CLASSES)  # the annotators could use every class
     print_report(rows, session_events, layers)
     return rows

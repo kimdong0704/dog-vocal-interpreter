@@ -39,6 +39,9 @@ FRAME_BOUNDARY_EPSILON: float = 1e-6
 
 SED_CLASSES_FILENAME: str = "sed_classes.json"
 EVENTS_FILENAME: str = "events.csv"
+# clip_id plus every original label column of the source, for labels the manifest has no
+# column for (environment, arousal, the authors' split, ...).
+LABELS_FILENAME: str = "labels.csv"
 # One row per annotated event; sed_class is "" when the label maps to no SED class.
 EVENT_COLUMNS: list[str] = ["clip_id", "start_s", "end_s", "sed_class", "original_label"]
 
@@ -181,6 +184,13 @@ def write_events(out_dir: Path, events: list[dict[str, Any]]) -> None:
     frame = pd.DataFrame(events, columns=EVENT_COLUMNS)
     frame = frame.sort_values(EVENT_COLUMNS, kind="stable")
     write_csv(frame, out_dir / EVENTS_FILENAME)
+
+
+def write_labels(out_dir: Path, label_rows: list[dict[str, Any]], columns: list[str]) -> None:
+    """Write out_dir/labels.csv with the given columns (clip_id first), sorted by clip_id."""
+    frame = pd.DataFrame(label_rows, columns=columns)
+    frame = frame.sort_values("clip_id", kind="stable")
+    write_csv(frame, out_dir / LABELS_FILENAME)
 
 
 # --- Archives ---

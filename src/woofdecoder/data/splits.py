@@ -22,7 +22,12 @@ DOG_GROUPS_FILENAME: str = "dog_groups.csv"
 EVALUATED_SPLITS: tuple[str, ...] = ("train", "val", "test")
 # Leakage groups allowed in more than one of train / val / test. Each entry needs a comment
 # explaining why the overlap cannot inflate the reported scores.
-ALLOWED_CROSS_SPLIT_GROUPS: tuple[str, ...] = ()
+ALLOWED_CROSS_SPLIT_GROUPS: tuple[str, ...] = (
+    # Act_Env, EmotionalCanines and DogSpeak come from the same lab and YouTube pool. Only
+    # EmotionalCanines validation is evaluated; its authors state the splits are
+    # dog-disjoint. Act_Env overlap with it is unknown (data plan, split rule 8).
+    "barkopedia_pool",
+)
 MAX_LISTED_PROBLEMS: int = 10
 
 
