@@ -12,6 +12,17 @@
   "rows": 627,
   "sha1": "b10f585423d206532431d627bab198c614665e2b"
  },
+ "dog_pose": {
+  "files": 2,
+  "rows": 0,
+  "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+ },
+ "dogposecv": {
+  "files": 6,
+  "labels_sha1": "73af491947d832900e0847a5990e2b2f4953115e",
+  "rows": 20423,
+  "sha1": "2d8f44de055ab8e103b04dcee7b7b8d305431ebd"
+ },
  "emotional_canines": {
   "files": 1202,
   "labels_sha1": "9b6e47ab441171ac2298fd9a3ca80f511eb0adb4",
@@ -31,5 +42,18 @@
   "labels_sha1": "e8eafde7303aebddfbb1ab8ca6adcabc3cf2af58",
   "rows": 760,
   "sha1": "190c680a3440c7c013874bd02e44bd009292a49e"
+ },
+ "stanford_dogs": {
+  "boxes_sha1": "0c10e17422231efffbaede362f0bddd0295221d6",
+  "files": 20583,
+  "index_sha1": "15906862ab7b1c4ce24164cbc46273819266d598",
+  "rows": 0,
+  "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+ },
+ "stanfordextra": {
+  "files": 5,
+  "labels_sha1": "d50c1eef3c66423c361c16fb388e6571cbed0bd0",
+  "rows": 12538,
+  "sha1": "e3db4de3cf237ca9694e0e1e9757d1ae70265d05"
  }
 }

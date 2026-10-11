@@ -19,12 +19,19 @@ from woofdecoder.data.download import load_datasets
 from woofdecoder.data.fileio import read_csv, write_json
 from woofdecoder.data.manifest import ROWS_FILENAME, processed_dir
 from woofdecoder.data.prepare.common import EVENTS_FILENAME, LABELS_FILENAME
+from woofdecoder.data.prepare.stanford_shared import BOXES_FILENAME, INDEX_FILENAME
 from woofdecoder.data.status import folder_stats
 
 FINGERPRINTS_FILENAME: str = "fingerprints.json"
 FINGERPRINT_COLUMNS: list[str] = ["clip_id", "split", "mapped_subtype"]
 # Optional per-source text files hashed into the fingerprint (key -> file name).
-HASHED_FILES: dict[str, str] = {"events_sha1": EVENTS_FILENAME, "labels_sha1": LABELS_FILENAME}
+HASHED_FILES: dict[str, str] = {
+    "events_sha1": EVENTS_FILENAME,
+    "labels_sha1": LABELS_FILENAME,
+    # stanford_dogs has no rows: its shared split and boxes live in these two files.
+    "index_sha1": INDEX_FILENAME,
+    "boxes_sha1": BOXES_FILENAME,
+}
 
 
 def fingerprints_path(splits_dir: Path | None = None) -> Path:

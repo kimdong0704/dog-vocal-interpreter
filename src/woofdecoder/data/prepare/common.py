@@ -333,8 +333,10 @@ def add_coco_annotation(
     category_name: str,
     bbox: list[float],
     keypoints: list[float] | None = None,
+    segmentation: dict[str, Any] | None = None,
 ) -> int:
-    """Add a box [x, y, width, height] (and optional flat [x, y, v, ...] keypoints).
+    """Add a box [x, y, width, height], optional flat [x, y, v, ...] keypoints and an
+    optional segmentation (COCO RLE {"size", "counts"}).
 
     Returns:
         The new annotation id.
@@ -366,6 +368,8 @@ def add_coco_annotation(
                 labelled_count += 1
         annotation["keypoints"] = list(keypoints)
         annotation["num_keypoints"] = labelled_count
+    if segmentation is not None:
+        annotation["segmentation"] = segmentation
     coco["annotations"].append(annotation)
     return annotation_id
 

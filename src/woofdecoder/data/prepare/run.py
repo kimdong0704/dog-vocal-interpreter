@@ -26,6 +26,7 @@ from typing import Any
 import pandas as pd
 
 from woofdecoder.config import get_data_dir, load_data_dir_from_env_file
+from woofdecoder.data.console import use_utf8_output
 from woofdecoder.data.download import load_datasets, select_dataset
 from woofdecoder.data.manifest import build_manifest, processed_dir, write_source_rows
 from woofdecoder.data.prepare.fingerprints import (
@@ -186,6 +187,7 @@ def run_check() -> int:
 
 def main(argv: list[str] | None = None) -> int:
     """Prepare every source, one source, or only list (--dry-run) or verify (--check)."""
+    use_utf8_output()
     parser = argparse.ArgumentParser(
         prog="python -m woofdecoder.data.prepare",
         description="Prepare raw datasets into <data_dir>/processed/<id>/.",
