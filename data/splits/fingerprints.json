@@ -1,0 +1,17 @@
+{
+ "audioset_strong_eval": {
+  "files": 1257,
+  "rows": 627,
+  "sha1": "b10f585423d206532431d627bab198c614665e2b"
+ },
+ "esc50": {
+  "files": 3963,
+  "rows": 2000,
+  "sha1": "40df6bdb50887f7b7d69e7dc6d4153a67a0c0357"
+ },
+ "playpant": {
+  "files": 793,
+  "rows": 760,
+  "sha1": "190c680a3440c7c013874bd02e44bd009292a49e"
+ }
+}
