@@ -11,6 +11,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "numpy",
     "pandas",
+    "pillow",
     "pyyaml",
     "soundfile",
     "tqdm",
@@ -19,6 +20,8 @@ dependencies = [
 
 [project.optional-dependencies]
 ml = ["torch", "transformers", "huggingface_hub", "librosa", "scikit-learn"]
+# Data preparation: soxr resamples audio, pyarrow reads the AudioSet parquet files.
+data = ["soxr", "pyarrow"]
 app = ["fastapi", "uvicorn[standard]", "python-multipart", "gradio"]
 dev = ["pytest", "ruff", "ipykernel", "nbstripout", "matplotlib"]
 [tool.setuptools.packages.find]

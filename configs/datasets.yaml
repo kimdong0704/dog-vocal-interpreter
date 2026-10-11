@@ -57,10 +57,11 @@ datasets:
   # --- Vision: pose ---
   # Pose: images for StanfordExtra labels.
   - id: stanford_dogs
-    name: "Stanford Dogs: 120 breeds, images and train/test lists"
+    name: "Stanford Dogs: 120 breeds, images, train/test lists and dog boxes"
     link: http://vision.stanford.edu/aditya86/ImageNetDogs/main.html
-    patterns: ["images.tar", "lists.tar"]
-    approx_size_gb: 0.76
+    # annotation.tar: the official dog bounding boxes, PASCAL VOC XML per image.
+    patterns: ["images.tar", "lists.tar", "annotation.tar"]
+    approx_size_gb: 0.78
     license_url: http://vision.stanford.edu/aditya86/ImageNetDogs/main.html
 
   # Pose: final keypoint labels (MIT) with official train/val/test splits. Needs Kaggle keys.

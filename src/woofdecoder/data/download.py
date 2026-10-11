@@ -27,6 +27,7 @@ from dataset_downloader.auth import EnvFileError
 from dataset_downloader.models import DatasetResult, FileTask
 
 from woofdecoder.config import ENV_FILE, REPO_ROOT, get_data_dir, load_data_dir_from_env_file
+from woofdecoder.data.console import use_utf8_output
 
 DATASETS_CONFIG: Path = REPO_ROOT / "configs" / "datasets.yaml"
 LOG_FILENAME: str = "download_log.csv"
@@ -163,6 +164,7 @@ def main(argv: list[str] | None = None) -> int:
     Returns:
         Exit code: 0 all done, 1 a dataset failed or needs action, 2 bad .env, 130 interrupted.
     """
+    use_utf8_output()
     parser = argparse.ArgumentParser(
         prog="python -m woofdecoder.data.download",
         description="Download raw datasets into <data_dir>/raw/<id>/.",

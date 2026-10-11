@@ -1,0 +1,71 @@
+{
+ "act_env": {
+  "files": 12982,
+  "labels_sha1": "6f444de81507edef9067e9b444d82e3f7a3f9cb8",
+  "rows": 12980,
+  "sha1": "b67ce17725ff07187ca2002bde1e36328688c7ef"
+ },
+ "audioset_strong_eval": {
+  "events_sha1": "6a7e9a56a1bb67eb89e1fd6214905b6aa55e305a",
+  "files": 1258,
+  "labels_sha1": "471dd2b86349594195dbace4c85030544683e063",
+  "rows": 627,
+  "sha1": "b10f585423d206532431d627bab198c614665e2b"
+ },
+ "dog_pose": {
+  "files": 2,
+  "rows": 0,
+  "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+ },
+ "dogposecv": {
+  "files": 6,
+  "labels_sha1": "73af491947d832900e0847a5990e2b2f4953115e",
+  "rows": 20423,
+  "sha1": "2d8f44de055ab8e103b04dcee7b7b8d305431ebd"
+ },
+ "emotional_canines": {
+  "files": 1202,
+  "labels_sha1": "9b6e47ab441171ac2298fd9a3ca80f511eb0adb4",
+  "rows": 1200,
+  "sha1": "78ce7595379c0283c668d6c594f0341c70c203c5"
+ },
+ "esc50": {
+  "events_sha1": "71bb259679b7630398c20bb67993918fc4de9030",
+  "files": 3964,
+  "labels_sha1": "56f80168f1024968fee1bd894afadabca648bcc3",
+  "rows": 2000,
+  "sha1": "40df6bdb50887f7b7d69e7dc6d4153a67a0c0357"
+ },
+ "playpant": {
+  "events_sha1": "ede94634553c384c76c79fa1d09f9f77cf4ef175",
+  "files": 794,
+  "labels_sha1": "e8eafde7303aebddfbb1ab8ca6adcabc3cf2af58",
+  "rows": 760,
+  "sha1": "190c680a3440c7c013874bd02e44bd009292a49e"
+ },
+ "rf_bowl": {
+  "files": 5026,
+  "labels_sha1": "78cb4a4d792d5d83c7a7471f6e816fe1bf1747e8",
+  "rows": 5021,
+  "sha1": "9748e42c8f42ca5957a8af88da55f853cf606b67"
+ },
+ "rf_leash": {
+  "files": 9359,
+  "labels_sha1": "659c2814a28d4c6b47e11f503daae517449b3a40",
+  "rows": 9354,
+  "sha1": "8ec97c95c15278fa705d96f63964ab6dd22801f0"
+ },
+ "stanford_dogs": {
+  "boxes_sha1": "0c10e17422231efffbaede362f0bddd0295221d6",
+  "files": 20583,
+  "index_sha1": "15906862ab7b1c4ce24164cbc46273819266d598",
+  "rows": 0,
+  "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+ },
+ "stanfordextra": {
+  "files": 5,
+  "labels_sha1": "d50c1eef3c66423c361c16fb388e6571cbed0bd0",
+  "rows": 12538,
+  "sha1": "e3db4de3cf237ca9694e0e1e9757d1ae70265d05"
+ }
+}
