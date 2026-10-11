@@ -4,6 +4,8 @@ Run with:
     python -m woofdecoder.data.download          # every dataset
     python -m woofdecoder.data.download <id>     # only that dataset
 
+or from Python (also inside Jupyter): download_one("<id>") or download_all().
+
 Downloads go through dataset-downloader: interrupted files resume on the next run, and
 every run appends one row per dataset to <data_dir>/raw/download_log.csv.
 Tokens are read only from the repo's .env file (see .env.example).
@@ -14,12 +16,15 @@ Exit codes: 0 all done, 1 a dataset failed or needs action, 2 bad usage, 130 int
 from __future__ import annotations
 
 import argparse
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
 import yaml
 from dataset_downloader import Downloader
 from dataset_downloader.auth import EnvFileError
+from dataset_downloader.models import DatasetResult, FileTask
 
 from woofdecoder.config import ENV_FILE, REPO_ROOT, get_data_dir, load_data_dir_from_env_file
 
@@ -80,6 +85,78 @@ def queue_dataset(downloader: Downloader, dataset: dict[str, Any]) -> None:
         raise ValueError(f"{dataset_id}: needs either 'link' or 'provider' + 'args'")
 
 
+def is_event_loop_running() -> bool:
+    """Return True if this thread already runs an asyncio event loop (as Jupyter does)."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return False
+    return True
+
+
+def print_file_event(name: str, task: FileTask, details: dict[str, Any]) -> None:
+    """Print one line per file event, e.g. "finished  esc50/ESC-50.zip".
+
+    Used instead of the live progress bar inside Jupyter, where that bar needs ipywidgets
+    and fails to render in VS Code. "reason" (failed, retry, skipped) is already redacted.
+    """
+    line = f"{name:>9}  {task.dataset}/{task.path}"
+    reason = details.get("reason")
+    if reason:
+        line += f"  ({reason})"
+    print(line, flush=True)
+
+
+def run_downloads(selected: list[dict[str, Any]]) -> list[DatasetResult]:
+    """Download the selected datasets into <data_dir>/raw/<id>/.
+
+    Downloader.run() calls asyncio.run(), which fails inside a running event loop. In that
+    case (Jupyter) the run moves to a worker thread, which has no loop of its own, and prints
+    one text line per file instead of the live progress bar. From a terminal it runs in this
+    thread with the progress bar, so Ctrl+C still stops it.
+
+    Returns:
+        One DatasetResult per dataset (the rows of the console summary).
+
+    Raises:
+        EnvFileError: If the .env file is missing or lacks an entry.
+        KeyboardInterrupt: If the download was interrupted (partial files are kept).
+    """
+    load_data_dir_from_env_file()
+    raw_dir = get_data_dir() / "raw"
+    downloader = Downloader(raw_dir, log_path=raw_dir / LOG_FILENAME, env_file=ENV_FILE)
+    for dataset in selected:
+        queue_dataset(downloader, dataset)
+
+    if not is_event_loop_running():
+        return downloader.run()
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(downloader.run, progress=False, on_event=print_file_event)
+        return future.result()
+
+
+def download_one(dataset_id: str) -> list[DatasetResult]:
+    """Download one dataset from configs/datasets.yaml; finished files are skipped.
+
+    Returns:
+        The DatasetResult of that dataset (a list, like download_all).
+
+    Raises:
+        ValueError: If dataset_id is not in configs/datasets.yaml.
+    """
+    selected = select_dataset(load_datasets(), dataset_id)
+    return run_downloads(selected)
+
+
+def download_all() -> list[DatasetResult]:
+    """Download every dataset in configs/datasets.yaml; finished datasets are skipped.
+
+    Returns:
+        One DatasetResult per dataset.
+    """
+    return run_downloads(load_datasets())
+
+
 def main(argv: list[str] | None = None) -> int:
     """Download every dataset, or only the one named on the command line.
 
@@ -93,23 +170,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("dataset_id", nargs="?", help="dataset to download (default all)")
     args = parser.parse_args(argv)
     try:
-        selected = select_dataset(load_datasets(), args.dataset_id)
+        select_dataset(load_datasets(), args.dataset_id)
     except ValueError as error:
         parser.error(str(error))  # exits with code 2
 
-    load_data_dir_from_env_file()
-    raw_dir = get_data_dir() / "raw"
     try:
-        downloader = Downloader(raw_dir, log_path=raw_dir / LOG_FILENAME, env_file=ENV_FILE)
+        if args.dataset_id is None:
+            results = download_all()
+        else:
+            results = download_one(args.dataset_id)
     except EnvFileError as error:
         print(error)
         return EXIT_USAGE
-
-    for dataset in selected:
-        queue_dataset(downloader, dataset)
-
-    try:
-        results = downloader.run()
     except KeyboardInterrupt:
         # The library has already logged the datasets as interrupted.
         return EXIT_INTERRUPTED

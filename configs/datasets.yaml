@@ -2,7 +2,10 @@
 # No id downloads everything; an id downloads only that dataset
 # Files go to<data_dir>/raw/<id>/
 # Grouped by pipeline stage
-# Sizes are approximately total = 8 GB
+# approx_size_gb: expected size on disk (total ≈ 8 GB); the download check flags folders
+#   more than 10% smaller.
+# license_url: page that states the license; save it by hand into
+#   <data_dir>/licenses/<id>_license.md
 
 datasets:
   # --- Audio ---
@@ -11,14 +14,18 @@ datasets:
     name: "PlayPanT: dog play-session audio recordings with annotations"
     link: https://zenodo.org/records/18972388
     # "02 Raw recordings.zip" (43.4 GB) is left out: large and not needed.
-    patterns: ["03 *", "04 *", "05 *", "06 *"]          # ≈ 0.38 GB
+    patterns: ["03 *", "04 *", "05 *", "06 *"]
+    approx_size_gb: 0.38
+    license_url: https://zenodo.org/records/18972388
 
   # Bark detector: secondary validation (optimistic: the detector was trained on AudioSet).
   - id: audioset_strong_eval
     name: "AudioSet strong labels (animal sounds), eval split mirror"
     link: https://huggingface.co/datasets/enyoukai/AudioSet-Strong-Animals
     revision: 804fa9ccfa8251edb08c5721471bdde9638adc62
-    patterns: ["data/eval-*.parquet", "README.md"]       # ≈ 3.0 GB
+    patterns: ["data/eval-*.parquet", "README.md"]
+    approx_size_gb: 3.0
+    license_url: https://research.google.com/audioset/download_strong.html
 
   # Bark detector: false-alarm negatives; audio branch: noise for augmentation.
   - id: esc50
@@ -26,27 +33,35 @@ datasets:
     provider: url
     args:
       url: https://github.com/karolpiczak/ESC-50/archive/33c8ce9eb2cf0b1c2f8bcf322eb349b6be34dbb6.zip
-      path: ESC-50.zip                                   # ≈ 0.6 GB
+      path: ESC-50.zip
+    approx_size_gb: 0.6
+    license_url: https://github.com/karolpiczak/ESC-50#license
 
   # Audio branch: training (situation labels for 4 of the 9 subtypes).
   - id: act_env
     name: "Barkopedia: dog barks labeled by activity and environment"
     link: https://huggingface.co/datasets/ArlingtonCL2/Barkopedia_Dog_Act_Env
     revision: 60a721a7f9477634971f6b3df29dc2a5e56994d8
-    patterns: ["train/*", "validation/*", "README.md"]   # ≈ 0.61 GB
+    patterns: ["train/*", "validation/*", "README.md"]
+    approx_size_gb: 0.61
+    license_url: https://huggingface.co/datasets/ArlingtonCL2/Barkopedia_Dog_Act_Env
 
   # Audio branch: emotion head (train + dog-disjoint validation).
   - id: emotional_canines
     name: "Barkopedia: dog vocalizations labeled by emotion"
     link: https://huggingface.co/datasets/ArlingtonCL2/BarkopediaDogEmotionClassification_Data
-    revision: c0617b15562882b9eee4cc1bcb8e6aa80e51bd34   # ≈ 0.07 GB
+    revision: c0617b15562882b9eee4cc1bcb8e6aa80e51bd34
+    approx_size_gb: 0.07
+    license_url: https://huggingface.co/datasets/ArlingtonCL2/BarkopediaDogEmotionClassification_Data
 
   # --- Vision: pose ---
   # Pose: images for StanfordExtra labels.
   - id: stanford_dogs
     name: "Stanford Dogs: 120 breeds, images and train/test lists"
     link: http://vision.stanford.edu/aditya86/ImageNetDogs/main.html
-    patterns: ["images.tar", "lists.tar"]                # ≈ 0.76 GB
+    patterns: ["images.tar", "lists.tar"]
+    approx_size_gb: 0.76
+    license_url: http://vision.stanford.edu/aditya86/ImageNetDogs/main.html
 
   # Pose: final keypoint labels (MIT) with official train/val/test splits. Needs Kaggle keys.
   - id: stanfordextra
@@ -54,7 +69,9 @@ datasets:
     provider: kaggle
     args:
       dataset: sachadee/stanford-dogs-dataset-for-animal-pose-estimation
-      version: 1                                         # ≈ 0.02 GB
+      version: 1
+    approx_size_gb: 0.02
+    license_url: https://www.kaggle.com/datasets/sachadee/stanford-dogs-dataset-for-animal-pose-estimation
 
   # Pose: day-1 baseline (images + YOLO keypoints in one file).
   - id: dog_pose
@@ -64,22 +81,30 @@ datasets:
     args:
       url: https://github.com/ultralytics/assets/releases/download/v0.0.0/dog-pose.zip
       size: 353152125
-      md5: 7169e61b3c2d267c6105446f391d16cd               # ≈ 0.35 GB
+      md5: 7169e61b3c2d267c6105446f391d16cd
+    approx_size_gb: 0.35
+    license_url: https://docs.ultralytics.com/datasets/pose/dog-pose/
 
   # --- Vision: posture ---
   # Body-language branch: posture head (standing / sitting / lying).
   - id: dogposecv
     name: "Dog pose classification images (standing, sitting, lying, ...)"
     link: https://huggingface.co/datasets/stockeh/dog-pose-cv
-    revision: 5c57f03beba003aa658e7d17891470e0ee5b8c8d   # ≈ 0.82 GB
+    revision: 5c57f03beba003aa658e7d17891470e0ee5b8c8d
+    approx_size_gb: 0.82
+    license_url: https://huggingface.co/datasets/stockeh/dog-pose-cv
 
   # --- Scene ---
   # Scene branch: leash evaluation (classes dog, leash, person). Needs a Roboflow key.
   - id: rf_leash
     name: "Roboflow ai-stray-dog-project v1 (leash boxes)"
     link: https://universe.roboflow.com/rusydan/ai-stray-dog-project/dataset/1
+    approx_size_gb: 0.32
+    license_url: https://universe.roboflow.com/rusydan/ai-stray-dog-project/dataset/1
 
   # Scene branch: bowl evaluation (classes cat, dog, bowl). Needs a Roboflow key.
   - id: rf_bowl
     name: "Roboflow cat-dog-bowl v20 (bowl boxes)"
     link: https://universe.roboflow.com/eyedetection-s8fd9/cat-dog-bowl-ncx2x/dataset/20
+    approx_size_gb: 1.0
+    license_url: https://universe.roboflow.com/eyedetection-s8fd9/cat-dog-bowl-ncx2x/dataset/20
