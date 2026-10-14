@@ -131,24 +131,33 @@ Videos of dogs barking in known situations, collected with owner consent. They a
 
 ```
 dog-vocal-interpreter/
-├── src/woofdata/      # dataset download, prep, splits, loaders
-│   ├── download/       #   raw downloads and status tables
-│   ├── prepare/        #   manifest, splits; sources/ has one converter per dataset
-│   └── loader/         #   load one sample of a task
-├── src/woofdecoder/    # model architecture: what the app and the trainer call
-│   ├── taxonomy.py     #   categories and subtypes
-│   ├── pipeline.py     #   video in → predictions out
-│   ├── preprocess/     #   audio/frame extraction, bark segments
-│   ├── branches/       #   audio, body-language, scene models
-│   └── fusion/         #   combining models, calibration
-├── src/wooftrainer/    # training and evaluation
-│   ├── torch_datasets.py #   PyTorch dataset over one task and split
-│   └── eval/           #   metrics
-├── app/                # backend and web UI
-├── notebooks/          # experiments
-├── configs/            # model and dataset settings
-├── tests/              # automated tests
-└── docs/               # documentation
+├── src/
+│   ├── woofdata/              # data: download, prepare and load (no torch)
+│   │   ├── download/          #   python -m woofdata.download; status tables (reporter.py)
+│   │   ├── prepare/           #   python -m woofdata.prepare; manifest, splits, fingerprints
+│   │   │   ├── sources/       #     one converter per dataset, listed in registry.py
+│   │   │   └── utils/         #     audio, windows, archives, COCO, label files, hash splits
+│   │   ├── loader/            #   load_sample(task, row); audio/ and image/ loaders
+│   │   ├── tasks.py           #   training tasks, their sources and sample types; task_rows()
+│   │   ├── path.py            #   repo root, .env file, data folder
+│   │   └── utils_*.py         #   console and file helpers
+│   ├── woofdecoder/           # model architecture: what the app and the trainer call
+│   │   ├── taxonomy.py        #   categories and subtypes
+│   │   ├── sed_classes.py     #   sound-event classes the bark detector finds
+│   │   ├── pipeline.py        #   video in → predictions out
+│   │   ├── preprocess/        #   audio/frame extraction, bark segments
+│   │   ├── branches/          #   bark detector, audio, body-language and scene models
+│   │   └── fusion/            #   combining the branches, calibration
+│   └── wooftrainer/           # training and evaluation
+│       ├── torch_datasets.py  #   PyTorch dataset over one task and split
+│       └── eval/              #   metrics
+├── app/                       # backend (api/) and web UI (web/)
+├── configs/                   # datasets.yaml (what to download), pipeline.yaml (settings)
+├── data/splits/               # split files and fingerprints: the only committed data
+├── models/                    # trained weights (not committed)
+├── notebooks/                 # experiments
+├── tests/                     # automated tests
+└── docs/                      # documentation
 ```
 
 ---
