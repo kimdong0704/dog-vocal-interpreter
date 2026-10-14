@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 import soundfile
 
-from woofdecoder.data.prepare import (
+from woofdata.prepare.sources import (
     act_env,
     audioset_strong_eval,
     emotional_canines,

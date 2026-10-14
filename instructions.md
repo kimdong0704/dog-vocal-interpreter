@@ -121,8 +121,8 @@ Keep **every line**. Leave a value empty if you don't need it.
 
 | Command | Downloads |
 |---|---|
-| `python -m woofdecoder.data.download` | Every dataset (≈ 8 GB; keep 15 GB free) |
-| `python -m woofdecoder.data.download <id>` | One dataset (ids are in `configs/datasets.yaml`) |
+| `python -m woofdata.download` | Every dataset (≈ 8 GB; keep 15 GB free) |
+| `python -m woofdata.download <id>` | One dataset (ids are in `configs/datasets.yaml`) |
 
 Files are saved to `<data_dir>/raw/<id>/`.
 

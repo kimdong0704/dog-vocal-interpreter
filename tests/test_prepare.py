@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import tarfile
 import zipfile
+from collections.abc import Callable
 from pathlib import Path, PureWindowsPath
 
 import numpy as np
@@ -12,26 +13,21 @@ import pandas as pd
 import pytest
 import soundfile
 
-from woofdecoder.data import splits
-from woofdecoder.data.download import load_datasets
-from woofdecoder.data.fileio import relative_data_path
-from woofdecoder.data.manifest import ManifestRow, make_clip_id, rows_to_frame, write_source_rows
-from woofdecoder.data.prepare import registry, run
-from woofdecoder.data.prepare.common import (
-    events_to_frame_targets,
-    extract_members,
-    load_audio,
-    make_windows,
-    to_mono_16k,
-    write_wav_16k,
-)
-from woofdecoder.data.prepare.fingerprints import (
+from woofdata.download.datasets import load_datasets
+from woofdata.prepare import run, splits
+from woofdata.prepare.fingerprints import (
     check_fingerprints,
     fingerprint_source,
     load_fingerprints,
     record_fingerprint,
 )
-from woofdecoder.data.splits import check_splits
+from woofdata.prepare.manifest import ManifestRow, make_clip_id, rows_to_frame, write_source_rows
+from woofdata.prepare.sources import registry
+from woofdata.prepare.splits import check_splits
+from woofdata.prepare.utils.archives import extract_members
+from woofdata.prepare.utils.audio import load_audio, to_mono_16k, write_wav_16k
+from woofdata.prepare.utils.windows import events_to_frame_targets, make_windows
+from woofdata.utils_fileio import relative_data_path
 
 SOURCE_RATE: int = 44_100
 CLIP_SECONDS: float = 0.5
@@ -159,7 +155,9 @@ def make_tar(path: Path, member_names: list[str]) -> None:
 
 
 @pytest.mark.parametrize("make_archive", [make_zip, make_tar])
-def test_extract_members_only_requested(tmp_path: Path, make_archive: object) -> None:
+def test_extract_members_only_requested(
+    tmp_path: Path, make_archive: Callable[[Path, list[str]], None]
+) -> None:
     """Test: Only the named members (or pattern matches) are extracted, in sorted order."""
     archive_path = tmp_path / "archive"
     out_dir = tmp_path / "out"

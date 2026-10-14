@@ -131,13 +131,18 @@ Videos of dogs barking in known situations, collected with owner consent. They a
 
 ```
 dog-vocal-interpreter/
-├── src/woofdecoder/    # the package the app runs
+├── src/woofdata/      # dataset download, prep, splits, loaders
+│   ├── download/       #   raw downloads and status tables
+│   ├── prepare/        #   manifest, splits; sources/ has one converter per dataset
+│   └── loader/         #   load one sample of a task
+├── src/woofdecoder/    # model architecture: what the app and the trainer call
 │   ├── taxonomy.py     #   categories and subtypes
 │   ├── pipeline.py     #   video in → predictions out
-│   ├── data/           #   dataset download, splits
 │   ├── preprocess/     #   audio/frame extraction, bark segments
 │   ├── branches/       #   audio, body-language, scene models
-│   ├── fusion/         #   combining models, calibration
+│   └── fusion/         #   combining models, calibration
+├── src/wooftrainer/    # training and evaluation
+│   ├── torch_datasets.py #   PyTorch dataset over one task and split
 │   └── eval/           #   metrics
 ├── app/                # backend and web UI
 ├── notebooks/          # experiments

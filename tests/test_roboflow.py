@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections import Counter
+from typing import Any
 
 import pytest
 
-from woofdecoder.data.prepare import roboflow
-from woofdecoder.data.prepare.common import balanced_group_splits
+from woofdata.prepare.sources import roboflow
+from woofdata.prepare.utils.hash_splits import balanced_group_splits
 
 
 def test_category_mapping() -> None:
@@ -68,7 +69,7 @@ def roboflow_image(file_name: str, width: int, height: int) -> dict[str, object]
 def test_same_name_different_size_gets_size_suffixed_keys() -> None:
     """Test: frame_0012 and 10045 (different photos, different sizes) get distinct keys,
     so they no longer stop the converter; other keys stay as they are."""
-    split_cocos = {
+    split_cocos: dict[str, dict[str, Any]] = {
         "train": {
             "images": [
                 roboflow_image("frame_0012_png.rf.b922.jpg", 796, 966),
