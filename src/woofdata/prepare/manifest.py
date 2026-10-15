@@ -6,7 +6,7 @@ build_manifest() joins them into <data_dir>/processed/manifest.csv.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, fields
 from pathlib import Path, PurePath
 
 import pandas as pd
@@ -14,7 +14,7 @@ import pandas as pd
 from woofdata.download.datasets import load_datasets
 from woofdata.path import get_data_dir
 from woofdata.utils_fileio import read_csv, to_posix_path, write_csv
-from woofdecoder.taxonomy import SUBTYPE_TO_CATEGORY, SUBTYPES
+from woofdecoder.taxonomy import CATEGORIES
 
 PROCESSED_DIRNAME: str = "processed"
 MANIFEST_FILENAME: str = "manifest.csv"
@@ -52,7 +52,8 @@ class ManifestRow:
 
     dog_id is stored as "<source>_<dog id>" so ids from different sources never collide;
     without a dog id it becomes "<source>_<clip_id>" (each clip is its own group).
-    leakage_group defaults to dog_id. mapped_category is derived from mapped_subtype.
+    leakage_group defaults to dog_id. mapped_category is one of taxonomy.CATEGORIES, or ""
+    when the clip maps to no category.
     """
 
     clip_id: str
@@ -71,20 +72,18 @@ class ManifestRow:
     original_label: str = ""
     label_type: str
     label_provenance: str
-    mapped_subtype: str = ""
-    mapped_category: str = field(default="", init=False)
+    mapped_category: str = ""
     eval_allowed: bool = True
     notes: str = ""
 
     def __post_init__(self) -> None:
-        """Check the fixed-choice columns, fill the group keys and derive mapped_category."""
+        """Check the fixed-choice columns, and fill the group keys."""
         check_choice("split", self.split, SPLITS)
         check_choice("modality", self.modality, MODALITIES)
         check_choice("label_type", self.label_type, LABEL_TYPES)
         check_choice("label_provenance", self.label_provenance, LABEL_PROVENANCES)
-        if self.mapped_subtype:
-            check_choice("mapped_subtype", self.mapped_subtype, SUBTYPES)
-            self.mapped_category = SUBTYPE_TO_CATEGORY[self.mapped_subtype]
+        if self.mapped_category:
+            check_choice("mapped_category", self.mapped_category, CATEGORIES)
 
         if self.dog_id:
             self.dog_id = f"{self.source}_{self.dog_id}"

@@ -24,6 +24,7 @@ from woofdata.prepare.utils.archives import list_archive_members, open_archive, 
 from woofdata.prepare.utils.audio import convert_audio
 from woofdata.prepare.utils.label_files import write_labels
 from woofdata.utils_fileio import read_csv, relative_data_path
+from woofdecoder.taxonomy import OTHER_CATEGORY
 
 SOURCE: str = "act_env"
 # Author split -> label CSV and audio zips, relative to raw/act_env/.
@@ -41,16 +42,16 @@ AUDIO_DIRNAME: str = "audio"
 ACTIVITY_COLUMN: str = "activity"
 ENVIRONMENT_COLUMN: str = "environement"  # spelled this way in the authors' CSVs
 
-# Activity -> taxonomy subtype; "" means the activity is not a bark context we predict.
-ACTIVITY_TO_SUBTYPE: dict[str, str] = {
-    "alerting to sounds": "stranger_alert",
-    "begging for food": "demand",
-    "seeking attention": "interaction",
-    "playing with human": "play",
-    "playing with other animals": "play",
-    "playing with toy": "play",
-    "rest": "",
-    "taking shower": "",
+# Activity -> taxonomy category; activities outside the 4 situations map to OTHER_CATEGORY.
+ACTIVITY_TO_CATEGORY: dict[str, str] = {
+    "alerting to sounds": "alert_aggressive",
+    "begging for food": "attention_seeking",
+    "seeking attention": "attention_seeking",
+    "playing with human": "playful_excited",
+    "playing with other animals": "playful_excited",
+    "playing with toy": "playful_excited",
+    "rest": OTHER_CATEGORY,
+    "taking shower": OTHER_CATEGORY,
 }
 
 LEAKAGE_GROUP: str = "barkopedia_pool"
@@ -85,11 +86,11 @@ def check_activities(clips: list[dict[str, str]]) -> None:
     """
     unknown: Counter[str] = Counter()
     for clip in clips:
-        if normalize_label(clip[ACTIVITY_COLUMN]) not in ACTIVITY_TO_SUBTYPE:
+        if normalize_label(clip[ACTIVITY_COLUMN]) not in ACTIVITY_TO_CATEGORY:
             unknown[clip[ACTIVITY_COLUMN]] += 1
     if unknown:
         unknown_values = dict(sorted(unknown.items()))
-        raise ValueError(f"activity values not in ACTIVITY_TO_SUBTYPE: {unknown_values}")
+        raise ValueError(f"activity values not in ACTIVITY_TO_CATEGORY: {unknown_values}")
 
 
 def read_labels(raw_dir: Path) -> dict[str, dict[str, str]]:
@@ -131,7 +132,7 @@ def make_row(
         original_label=clip[ACTIVITY_COLUMN],
         label_type="context",
         label_provenance="vlm_video",
-        mapped_subtype=ACTIVITY_TO_SUBTYPE[normalize_label(clip[ACTIVITY_COLUMN])],
+        mapped_category=ACTIVITY_TO_CATEGORY[normalize_label(clip[ACTIVITY_COLUMN])],
         eval_allowed=False,
         notes=NOTES,
     )
@@ -176,18 +177,18 @@ def print_counts(title: str, values: list[str]) -> None:
 def print_report(
     rows: list[ManifestRow], clips: dict[str, dict[str, str]], durations: list[float]
 ) -> None:
-    """Print clips per (normalized) activity, environment and mapped subtype, the rare
+    """Print clips per (normalized) activity, environment and mapped category, the rare
     environment values, and the duration range."""
     activities: list[str] = []
     environments: list[str] = []
-    subtypes: list[str] = []
+    categories: list[str] = []
     for row in rows:
         activities.append(normalize_label(row.original_label))
         environments.append(clips[row.clip_id][NORMALIZED_ENVIRONMENT_COLUMN])
-        subtypes.append(row.mapped_subtype or "(none)")
+        categories.append(row.mapped_category)
     print_counts("clips per activity (normalized)", activities)
     print_counts("clips per environment (normalized)", environments)
-    print_counts("clips per mapped subtype", subtypes)
+    print_counts("clips per mapped category", categories)
     rare_values: list[str] = []
     for environment, count in sorted(Counter(environments).items()):
         if count < RARE_VALUE_COUNT:
@@ -203,7 +204,7 @@ def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
     """Convert both author splits into WAVs, labels.csv and train_only rows.
 
     Raises:
-        ValueError: If an activity is not in ACTIVITY_TO_SUBTYPE (checked before any audio
+        ValueError: If an activity is not in ACTIVITY_TO_CATEGORY (checked before any audio
             is converted), or a labelled clip is in none of the zips.
     """
     clips = read_labels(raw_dir)

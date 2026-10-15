@@ -12,7 +12,7 @@ import soxr
 from woofdecoder.config import load_config
 
 TARGET_SAMPLE_RATE: int = load_config()["media"]["sample_rate"]
-WAV_SUBTYPE: str = "PCM_16"
+WAV_ENCODING: str = "PCM_16"
 # soxr "HQ" quality: deterministic and good enough for 16 kHz speech-band audio.
 RESAMPLE_QUALITY: str = "HQ"
 
@@ -55,7 +55,7 @@ def write_wav_16k(path: Path, samples: np.ndarray) -> None:
     """Write mono samples (shape (num_samples,)) as a TARGET_SAMPLE_RATE 16-bit PCM WAV."""
     path.parent.mkdir(parents=True, exist_ok=True)
     clipped = np.clip(samples, -1.0, 1.0)  # values beyond full scale would wrap around
-    soundfile.write(path, clipped, TARGET_SAMPLE_RATE, subtype=WAV_SUBTYPE)
+    soundfile.write(path, clipped, TARGET_SAMPLE_RATE, subtype=WAV_ENCODING)
 
 
 def convert_audio(source: str | Path | bytes, out_path: Path) -> float:

@@ -1,7 +1,7 @@
 """Fingerprints of each prepared source, committed so teammates can confirm identical data.
 
 A fingerprint is the number of rows, the number of files in processed/<source>/, a sha1
-of the sorted (clip_id, split, mapped_subtype) list, and a sha1 of the sorted text rows of
+of the sorted (clip_id, split, mapped_category) list, and a sha1 of the sorted text rows of
 events.csv and labels.csv where the source has them (so changed events, which drive the
 frame targets, and changed labels show). It does not hash audio, image or .npy bytes, so
 tiny resampling differences between machines do not count as a mismatch.
@@ -23,7 +23,7 @@ from woofdata.prepare.utils.label_files import EVENTS_FILENAME, LABELS_FILENAME
 from woofdata.utils_fileio import read_csv, write_json
 
 FINGERPRINTS_FILENAME: str = "fingerprints.json"
-FINGERPRINT_COLUMNS: list[str] = ["clip_id", "split", "mapped_subtype"]
+FINGERPRINT_COLUMNS: list[str] = ["clip_id", "split", "mapped_category"]
 # Optional per-source text files hashed into the fingerprint (key -> file name).
 HASHED_FILES: dict[str, str] = {
     "events_sha1": EVENTS_FILENAME,
@@ -53,8 +53,8 @@ def fingerprint_source(source: str, data_dir: Path | None = None) -> dict[str, A
     rows = read_csv(source_dir / ROWS_FILENAME)
 
     lines: list[str] = []
-    for clip_id, split, mapped_subtype in rows[FINGERPRINT_COLUMNS].itertuples(index=False):
-        lines.append(f"{clip_id}\t{split}\t{mapped_subtype}")
+    for clip_id, split, mapped_category in rows[FINGERPRINT_COLUMNS].itertuples(index=False):
+        lines.append(f"{clip_id}\t{split}\t{mapped_category}")
 
     fingerprint: dict[str, Any] = {
         "rows": len(rows),

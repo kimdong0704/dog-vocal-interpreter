@@ -39,10 +39,10 @@ def load_bark_detector(row: Row, max_seconds: float | None) -> BarkDetectorSampl
 
 
 def load_audio_context(row: Row, max_seconds: float | None) -> AudioContextSample:
-    """Return a clip, its mapped subtype (None if empty) and its labels.csv fields."""
+    """Return a clip, its mapped category (None if empty) and its labels.csv fields."""
     audio = load_audio_segment(row, max_seconds)
-    mapped_subtype = row["mapped_subtype"] or None
-    return AudioContextSample(row["clip_id"], audio, mapped_subtype, labels_for(row))
+    mapped_category = row["mapped_category"] or None
+    return AudioContextSample(row["clip_id"], audio, mapped_category, labels_for(row))
 
 
 def load_audio_emotion(row: Row, max_seconds: float | None) -> AudioEmotionSample:

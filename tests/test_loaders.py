@@ -80,7 +80,7 @@ def make_act_env(data_dir: Path) -> list[ManifestRow]:
         15.0,
         label_type="context",
         label_provenance="vlm_video",
-        mapped_subtype="play",
+        mapped_category="playful_excited",
         eval_allowed=False,
     )
     label = {"clip_id": row.clip_id, "environment_normalized": "near door", "activity": "rest"}
@@ -175,7 +175,7 @@ def test_max_seconds_takes_the_centre(data_dir: Path) -> None:
 def test_audio_context_defaults_to_ten_seconds(data_dir: Path) -> None:
     sample = load_sample("audio_context", task_rows("audio_context", "train").iloc[0])
     assert sample.audio.shape == (10 * TARGET_SAMPLE_RATE,)
-    assert sample.mapped_subtype == "play"
+    assert sample.mapped_category == "playful_excited"
     assert sample.labels["environment_normalized"] == "near door"
 
 

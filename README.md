@@ -3,9 +3,6 @@
 **Multimodal dog vocalization interpreter**: a web app that estimates what a dog is most
 likely communicating when it barks.
 
-> **Disclaimer:** WoofDecoder estimates the likely *context* of barking from patterns in
-> sound and video. It does **not** translate dog language.
-
 | | |
 |---|---|
 | **Status** | Early development. No results yet |
@@ -14,18 +11,17 @@ likely communicating when it barks.
 
 ---
 
-## Table of Contents
-1. [Motivation](#motivation)
-2. [Output Taxonomy](#output-taxonomy)
-3. [System Architecture](#system-architecture)
-4. [Datasets](#datasets)
-5. [Technology Stack](#technology-stack)
-6. [Repository Structure](#repository-structure)
-7. [License](#license)
+## Disclosure
+
+WoofDecoder estimates the likely *context* of barking from patterns in sound and video.
+It does **not** translate dog language.
+
+Some models and datasets are licensed for **non-commercial use only**. This project is for
+academic, non-commercial use.
 
 ---
 
-## Motivation
+## Description
 
 People read a barking dog with more than their ears. WoofDecoder does the same with
 three signals:
@@ -36,25 +32,25 @@ three signals:
 | **Body language** | *What state* is the dog in? | tail height, ear position, posture |
 | **Scene context** | *Why* might it be barking? | person at the door, ball, food bowl |
 
-**Research question:** does fusing all three modalities outperform the best single modality?
+Each bark is classified into one of 5 categories:
 
----
-
-## Output Taxonomy
-
-Each bark is classified into a **subtype**. A category's confidence is the sum of its
-subtypes' probabilities.
-
-| Category | Subtypes |
+| Category | Meaning |
 |---|---|
-| Alert / Aggressive | Stranger alert · Threat · Fearful / defensive |
-| Playful / Excited | Play · Greeting |
-| Distressed / Lonely | Separation · Anxious / whining |
-| Attention-seeking | Demand (food, walk, let out) · Interaction with owner |
+| Alert / Aggressive | Alerting to a stranger or sound, threat, fearful defense |
+| Playful / Excited | Play, greeting |
+| Distressed / Lonely | Separation, anxious whining |
+| Attention-seeking | Demanding food, a walk or interaction |
+| Other | The dog vocalizes, but in none of the 4 situations above (e.g. resting, bath) |
 
 ---
 
-## System Architecture
+## Research Question
+
+Does fusing all three modalities outperform the best single modality?
+
+---
+
+## Model Structure
 
 ```
 Uploaded video
@@ -71,99 +67,8 @@ Preprocessing ──► extract audio · detect bark segments · sample frames p
                              ▼
                 Fusion model (+ calibration)
                              ▼
-          Subtype and category probabilities per bark
+             Probabilities over the 5 categories per bark
 ```
 
 Every component starts from a **publicly available pretrained model** and is fine-tuned
 only as far as needed.
-
----
-
-## Datasets
-
-Public datasets for training and evaluation, plus clips collected by the team.
-All datasets are used for academic, non-commercial purposes and are **not redistributed**.
-
-### Audio Datasets
-
-| Dataset | Purpose | License |
-|---|---|---|
-| [Dog play pant](https://zenodo.org/records/18972388) | Bark detector validation · play test set | CC BY-NC 4.0 |
-| [AudioSet-Strong-Animals](https://huggingface.co/datasets/enyoukai/AudioSet-Strong-Animals) (eval) | Bark detector validation (secondary) | Labels CC BY 4.0 |
-| [ESC-50](https://github.com/karolpiczak/ESC-50) | Non-bark sounds · noise for augmentation | CC BY-NC 3.0 |
-| [Barkopedia Activity & Environment](https://huggingface.co/datasets/ArlingtonCL2/Barkopedia_Dog_Act_Env) | Audio model training | MIT |
-| [EmotionalCanines](https://huggingface.co/datasets/ArlingtonCL2/BarkopediaDogEmotionClassification_Data) | Audio emotion head | CC BY-NC-SA 4.0 |
-
-### Body-Language Datasets
-
-| Dataset | Purpose | License |
-|---|---|---|
-| [Stanford Dogs](http://vision.stanford.edu/aditya86/ImageNetDogs/) | Images for pose training | ImageNet terms (non-commercial) |
-| [StanfordExtra](https://github.com/benjiebob/StanfordExtra) | Dog keypoints (tail, ears) | MIT |
-| [Ultralytics Dog-Pose](https://docs.ultralytics.com/datasets/pose/dog-pose/) | Pose baseline | AGPL-3.0 zip (MIT upstream) |
-| [DogPoseCV](https://huggingface.co/datasets/stockeh/dog-pose-cv) | Body posture | Apache-2.0 labels |
-
-### Scene-Context Datasets
-
-| Dataset | Purpose | License |
-|---|---|---|
-| [Roboflow ai-stray-dog-project](https://universe.roboflow.com/rusydan/ai-stray-dog-project) | Leash detection | CC BY 4.0 |
-| [Roboflow cat-dog-bowl](https://universe.roboflow.com/eyedetection-s8fd9/cat-dog-bowl-ncx2x) | Food bowl detection | CC BY 4.0 |
-
-### Team-Collected Data
-Videos of dogs barking in known situations, collected with owner consent. They are the
-**primary test set** and the only data containing all three modalities together.
-
----
-
-## Technology Stack
-
-| Layer | Tools |
-|---|---|
-| Models | PyTorch · Hugging Face Transformers · pretrained audio, pose and vision models |
-| Backend | FastAPI |
-| Frontend | Gradio (prototype) → React (final) |
-| Data | [dataset-downloader](https://github.com/kimdong0704/dataset-downloader) (parallel, resumable downloads) |
-
----
-
-## Repository Structure
-
-```
-dog-vocal-interpreter/
-├── src/
-│   ├── woofdata/              # data: download, prepare and load (no torch)
-│   │   ├── download/          #   python -m woofdata.download; status tables (reporter.py)
-│   │   ├── prepare/           #   python -m woofdata.prepare; manifest, splits, fingerprints
-│   │   │   ├── sources/       #     one converter per dataset, listed in registry.py
-│   │   │   └── utils/         #     audio, windows, archives, COCO, label files, hash splits
-│   │   ├── loader/            #   load_sample(task, row); audio/ and image/ loaders
-│   │   ├── tasks.py           #   training tasks, their sources and sample types; task_rows()
-│   │   ├── path.py            #   repo root, .env file, data folder
-│   │   └── utils_*.py         #   console and file helpers
-│   ├── woofdecoder/           # model architecture: what the app and the trainer call
-│   │   ├── taxonomy.py        #   categories and subtypes
-│   │   ├── sed_classes.py     #   sound-event classes the bark detector finds
-│   │   ├── pipeline.py        #   video in → predictions out
-│   │   ├── preprocess/        #   audio/frame extraction, bark segments
-│   │   ├── branches/          #   bark detector, audio, body-language and scene models
-│   │   └── fusion/            #   combining the branches, calibration
-│   └── wooftrainer/           # training and evaluation
-│       ├── torch_datasets.py  #   PyTorch dataset over one task and split
-│       └── eval/              #   metrics
-├── app/                       # backend (api/) and web UI (web/)
-├── configs/                   # datasets.yaml (what to download), pipeline.yaml (settings)
-├── data/splits/               # split files and fingerprints: the only committed data
-├── models/                    # trained weights (not committed)
-├── notebooks/                 # experiments
-├── tests/                     # automated tests
-└── docs/                      # documentation
-```
-
----
-
-## License
-
-No license yet. Some models and datasets are licensed for **non-commercial use only**, so a
-license will be chosen before any public release. Until then, this project is for academic,
-non-commercial use.

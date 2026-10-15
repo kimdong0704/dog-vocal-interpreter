@@ -33,12 +33,12 @@ SOURCE_RATE: int = 44_100
 CLIP_SECONDS: float = 0.5
 
 
-def write_test_tone(path: Path, num_channels: int, sample_rate: int, subtype: str) -> None:
+def write_test_tone(path: Path, num_channels: int, sample_rate: int, encoding: str) -> None:
     """Write a CLIP_SECONDS sine tone with num_channels channels."""
     times = np.arange(int(CLIP_SECONDS * sample_rate)) / sample_rate  # shape (num_samples,)
     tone = 0.5 * np.sin(2 * np.pi * 440.0 * times)  # shape (num_samples,)
     channels = np.tile(tone[:, None], (1, num_channels))  # shape (num_samples, num_channels)
-    soundfile.write(path, channels, sample_rate, subtype=subtype)
+    soundfile.write(path, channels, sample_rate, subtype=encoding)
 
 
 def make_row(clip_name: str, split: str, dog_id: str = "", leakage_group: str = "") -> ManifestRow:
@@ -67,12 +67,12 @@ def use_temp_folders(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 # --- Audio ---
 
 
-@pytest.mark.parametrize(("num_channels", "subtype"), [(2, "PCM_16"), (1, "PCM_32"), (2, "FLOAT")])
-def test_audio_comes_out_16k_mono_16bit(tmp_path: Path, num_channels: int, subtype: str) -> None:
+@pytest.mark.parametrize(("num_channels", "encoding"), [(2, "PCM_16"), (1, "PCM_32"), (2, "FLOAT")])
+def test_audio_comes_out_16k_mono_16bit(tmp_path: Path, num_channels: int, encoding: str) -> None:
     """Test: Stereo and 32-bit inputs come out as 16 kHz mono 16-bit PCM WAV."""
     input_path = tmp_path / "input.wav"
     output_path = tmp_path / "out" / "output.wav"
-    write_test_tone(input_path, num_channels, SOURCE_RATE, subtype)
+    write_test_tone(input_path, num_channels, SOURCE_RATE, encoding)
 
     samples, sample_rate = load_audio(input_path)
     write_wav_16k(output_path, to_mono_16k(samples, sample_rate))
@@ -209,7 +209,7 @@ def test_clip_id_and_paths_ignore_windows_style() -> None:
 
 
 def test_manifest_row_derives_category_and_groups() -> None:
-    """Test: mapped_category comes from mapped_subtype; dog_id and leakage_group are filled."""
+    """Test: mapped_category is stored as given; dog_id and leakage_group are filled."""
     row = ManifestRow(
         clip_id="act_env/a.wav",
         source="act_env",
@@ -219,7 +219,7 @@ def test_manifest_row_derives_category_and_groups() -> None:
         file_path="processed/act_env/a.wav",
         label_type="context",
         label_provenance="uploader",
-        mapped_subtype="play",
+        mapped_category="playful_excited",
     )
     no_dog_row = make_row("b.wav", "train")
 
@@ -229,9 +229,9 @@ def test_manifest_row_derives_category_and_groups() -> None:
     assert no_dog_row.dog_id == "esc50_esc50/b.wav"
 
 
-def test_manifest_row_rejects_unknown_subtype() -> None:
-    """Test: A mapped_subtype outside taxonomy.SUBTYPES raises."""
-    with pytest.raises(ValueError, match="mapped_subtype"):
+def test_manifest_row_rejects_unknown_category() -> None:
+    """Test: A mapped_category outside taxonomy.CATEGORIES raises."""
+    with pytest.raises(ValueError, match="mapped_category"):
         ManifestRow(
             clip_id="x",
             source="esc50",
@@ -240,7 +240,7 @@ def test_manifest_row_rejects_unknown_subtype() -> None:
             file_path="x.wav",
             label_type="context",
             label_provenance="expert",
-            mapped_subtype="not_a_subtype",
+            mapped_category="not_a_category",
         )
 
 
@@ -293,7 +293,7 @@ def test_fingerprint_changes_only_when_a_label_changes(tmp_path: Path) -> None:
     write_source_rows("esc50", list(reversed(rows)), tmp_path)
     same = fingerprint_source("esc50", tmp_path)
 
-    rows[0].mapped_subtype = "play"
+    rows[0].mapped_category = "playful_excited"
     write_source_rows("esc50", rows, tmp_path)
     changed = fingerprint_source("esc50", tmp_path)
 

@@ -2,7 +2,7 @@
 
 Branch
 takes 1 BarkSegment
-returns 1 BranchOutput: probabilities over the shared subtype list from woofdecoder.taxonomy.
+returns 1 BranchOutput: probabilities over the shared category list from woofdecoder.taxonomy.
 
 The bark detector is NOT a Branch.
 It runs before the BarkSegments are consumed by the branches.
@@ -17,7 +17,7 @@ from typing import Any
 import numpy as np
 
 from woofdecoder.preprocess.segments import BarkSegment
-from woofdecoder.taxonomy import NUM_SUBTYPES, SUBTYPES
+from woofdecoder.taxonomy import CATEGORIES, NUM_CATEGORIES
 
 # How far the probabilities may be from summing to exactly 1.
 PROB_SUM_TOLERANCE = 1e-4
@@ -28,7 +28,7 @@ class BranchOutput:
     """One branch's prediction for one segment.
 
     Attributes:
-        probs: Subtype probabilities in SUBTYPES order, shape (NUM_SUBTYPES,). Must sum to 1.
+        probs: Category probabilities in CATEGORIES order, shape (NUM_CATEGORIES,). Must sum to 1.
         present: False if the modality was unavailable (e.g. no video), so fusion can skip it.
         extras: Evidence for the app's "why" panel (e.g. detected pose, matched scene prompt).
     """
@@ -45,10 +45,10 @@ class BranchOutput:
         """
         self.probs = np.asarray(self.probs, dtype=float)
 
-        expected_shape = (NUM_SUBTYPES,)
+        expected_shape = (NUM_CATEGORIES,)
         if self.probs.shape != expected_shape:
             raise ValueError(
-                f"BranchOutput.probs must have shape {expected_shape} (one value per subtype), "
+                f"BranchOutput.probs must have shape {expected_shape} (one value per category), "
                 f"got shape {self.probs.shape}."
             )
 
@@ -66,19 +66,19 @@ class BranchOutput:
         Returns:
             A BranchOutput with uniform probs and present=False.
         """
-        uniform_probs = np.full(NUM_SUBTYPES, 1.0 / NUM_SUBTYPES)
+        uniform_probs = np.full(NUM_CATEGORIES, 1.0 / NUM_CATEGORIES)  # shape (NUM_CATEGORIES,)
         return cls(probs=uniform_probs, present=False)
 
     def as_dict(self) -> dict[str, float]:
-        """Return the probabilities keyed by subtype name.
+        """Return the probabilities keyed by category name.
 
         Returns:
-            A dict mapping each subtype name to its probability.
+            A dict mapping each category name to its probability.
         """
         result: dict[str, float] = {}
 
-        for position, subtype_name in enumerate(SUBTYPES):
-            result[subtype_name] = float(self.probs[position])
+        for position, category_name in enumerate(CATEGORIES):
+            result[category_name] = float(self.probs[position])
 
         return result
 
@@ -93,7 +93,7 @@ class Branch(ABC):
 
     @abstractmethod
     def predict(self, segment: BarkSegment) -> BranchOutput:
-        """Predict subtype probabilities for one segment.
+        """Predict category probabilities for one segment.
 
         Args:
             segment: The bark segment to classify.

@@ -72,7 +72,7 @@ LAYER2_TEXT_TO_CODE: dict[str, str] = {
 
 SPLIT_SEED: int = 0
 NUM_VAL_DOGS: int = 9  # the other 8 dogs go to test
-MAPPED_SUBTYPE: str = "play"
+MAPPED_CATEGORY: str = "playful_excited"
 ORIGINAL_LABEL: str = "dog-human play"
 # datasets.yaml pins no revision for the Zenodo record, so the version is named here.
 SOURCE_VERSION: str = "zenodo18972388_v1"
@@ -281,7 +281,7 @@ def session_windows(
                 original_label=ORIGINAL_LABEL,
                 label_type="context",
                 label_provenance="protocol",
-                mapped_subtype=MAPPED_SUBTYPE,
+                mapped_category=MAPPED_CATEGORY,
                 notes=f"{LICENSE_NOTE}; events from {layer}",
             )
         )

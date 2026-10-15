@@ -36,7 +36,7 @@ datasets:
     approx_size_gb: 0.6
     license_url: https://github.com/karolpiczak/ESC-50#license
 
-  # Audio branch: training (situation labels for 4 of the 9 subtypes).
+  # Audio branch: training (situation labels for 3 of the 4 situation categories, plus other).
   - id: act_env
     name: "Barkopedia: dog barks labeled by activity and environment"
     link: https://huggingface.co/datasets/ArlingtonCL2/Barkopedia_Dog_Act_Env

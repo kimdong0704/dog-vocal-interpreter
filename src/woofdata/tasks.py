@@ -53,7 +53,7 @@ class AudioContextSample:
 
     clip_id: str
     audio: np.ndarray  # shape (num_samples,), float32 at 16 kHz
-    mapped_subtype: str | None  # a taxonomy subtype, None if the clip maps to none
+    mapped_category: str | None  # a taxonomy category, None if the clip maps to none
     labels: dict[str, str]  # e.g. environment_normalized, activity, original_split
 
 
@@ -115,7 +115,7 @@ class Task:
 
 TASKS: dict[str, Task] = {
     "bark_detector": Task(("playpant", "audioset_strong_eval", "esc50"), BarkDetectorSample),
-    # Act_Env trains (all train_only); PlayPanT (subtype play) is the val / test set.
+    # Act_Env trains (all train_only); PlayPanT (category playful_excited) is the val / test set.
     "audio_context": Task(("act_env", "playpant"), AudioContextSample, CLIP_MAX_SECONDS),
     "audio_emotion": Task(("emotional_canines",), AudioEmotionSample, CLIP_MAX_SECONDS),
     "pose": Task(("stanfordextra",), PoseSample),

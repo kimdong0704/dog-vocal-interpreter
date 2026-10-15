@@ -4,7 +4,7 @@ Raw files in raw/emotional_canines/ (pinned Hugging Face commit):
     {train,validation,test}/{husky,shiba}/<audio_id>.wav   e.g. train/husky/husky_train_00000.wav
     {husky,shiba}_{train,validation}_labels.csv           columns audio_id, arousal, valence
 The test split has no labels and is skipped. One row per whole clip, no windows.
-Emotion feeds an auxiliary head, so mapped_subtype stays empty.
+Emotion feeds an auxiliary head, so mapped_category stays empty.
 """
 
 from __future__ import annotations

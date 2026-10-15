@@ -19,7 +19,7 @@ from woofdata.prepare.sources import (
     playpant,
 )
 from woofdecoder.sed_classes import AUDIOSET_TO_SED, PLAYPANT_TO_SED, SED_CLASSES
-from woofdecoder.taxonomy import SUBTYPES
+from woofdecoder.taxonomy import CATEGORIES
 
 TONE_RATE: int = 44_100
 LAYER1_HEADER: str = "Selection\tView\tChannel\tBegin Time (s)\tEnd Time (s)\tAnnotation\n"
@@ -266,19 +266,19 @@ def test_esc50_clip_row(
 
 
 def test_act_env_activity_mapping() -> None:
-    """Test: Activities map to taxonomy subtypes as agreed; rest and shower map to none."""
-    assert act_env.ACTIVITY_TO_SUBTYPE == {
-        "alerting to sounds": "stranger_alert",
-        "begging for food": "demand",
-        "seeking attention": "interaction",
-        "playing with human": "play",
-        "playing with other animals": "play",
-        "playing with toy": "play",
-        "rest": "",
-        "taking shower": "",
+    """Test: Activities map to taxonomy categories as agreed; rest and shower map to other."""
+    assert act_env.ACTIVITY_TO_CATEGORY == {
+        "alerting to sounds": "alert_aggressive",
+        "begging for food": "attention_seeking",
+        "seeking attention": "attention_seeking",
+        "playing with human": "playful_excited",
+        "playing with other animals": "playful_excited",
+        "playing with toy": "playful_excited",
+        "rest": "other",
+        "taking shower": "other",
     }
-    for subtype in act_env.ACTIVITY_TO_SUBTYPE.values():
-        assert subtype == "" or subtype in SUBTYPES
+    for category in act_env.ACTIVITY_TO_CATEGORY.values():
+        assert category in CATEGORIES
 
 
 def test_act_env_unknown_activity_stops() -> None:
@@ -293,7 +293,8 @@ def test_act_env_unknown_activity_stops() -> None:
 
 
 def test_act_env_row_keeps_raw_label(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Test: A capitalised activity maps to its subtype; original_label keeps the raw text."""
+    """Test: A capitalised activity maps to its category; original_label keeps the raw text;
+    rest maps to other."""
     out_dir = processed_source_dir(monkeypatch, tmp_path, "act_env")
     clip = {
         "clip_id": "act_env/validation/audio_00000.wav",
@@ -304,11 +305,16 @@ def test_act_env_row_keeps_raw_label(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 
     row = act_env.make_row(clip, out_dir, 2.5, "rev")
 
-    assert row.mapped_subtype == "play"
+    assert row.mapped_category == "playful_excited"
     assert row.original_label == "Playing with Human"
     assert row.split == "train_only"
     assert row.eval_allowed is False
     assert row.file_path == "processed/act_env/audio/validation/audio_00000.wav"
+
+    rest_clip = clip | {"activity": "Rest"}
+    rest_row = act_env.make_row(rest_clip, out_dir, 2.5, "rev")
+
+    assert rest_row.mapped_category == "other"
 
 
 # --- EmotionalCanines ---
