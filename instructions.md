@@ -9,8 +9,9 @@ Follow the steps in order. For branches and pull requests, see [CONTRIBUTING.md]
 1. [Initial Setup](#1-initial-setup) (Steps 1–9)
 2. [Environment File](#2-environment-file) (Steps 10–11)
 3. [Data Download](#3-data-download) (Steps 12–14)
-4. [Daily Workflow](#4-daily-workflow)
-5. [Data Rules](#5-data-rules)
+4. [Data Preparation](#4-data-preparation) (Steps 15–18)
+5. [Daily Workflow](#5-daily-workflow)
+6. [Data Rules](#6-data-rules)
 
 ---
 
@@ -64,10 +65,19 @@ Do not clone into a OneDrive or iCloud folder.
 
 ```bash
 python -m pip install --upgrade pip
-pip install -e ".[dev]"
+pip install -e ".[dev,data]"
 ```
 
 If a browser window asks you to sign in to GitHub, sign in.
+
+| Extra | Adds | Needed for |
+|---|---|---|
+| `dev` | pytest, ruff, Jupyter kernel, nbstripout, matplotlib | Everyone |
+| `data` | soxr, pyarrow | Preparing the data (Section 4) |
+| `ml` | torch, transformers, librosa, scikit-learn | Training (`wooftrainer`) |
+| `app` | FastAPI, Uvicorn, Gradio | Running the app |
+
+Add extras as you need them, e.g. `pip install -e ".[dev,data,ml]"`.
 
 ### Step 8: Configure notebooks and VS Code
 
@@ -121,8 +131,8 @@ Keep **every line**. Leave a value empty if you don't need it.
 
 | Command | Downloads |
 |---|---|
-| `python -m woofdecoder.data.download` | Every dataset (≈ 8 GB; keep 15 GB free) |
-| `python -m woofdecoder.data.download <id>` | One dataset (ids are in `configs/datasets.yaml`) |
+| `python -m woofdata.download` | Every dataset (≈ 8 GB; keep 15 GB free) |
+| `python -m woofdata.download <id>` | One dataset (ids are in `configs/datasets.yaml`) |
 
 Files are saved to `<data_dir>/raw/<id>/`.
 
@@ -148,7 +158,65 @@ save it as `data/raw/licenses/<id>_<YYYY-MM-DD>.png`.
 
 ---
 
-## 4. Daily Workflow
+## 4. Data Preparation
+
+### Step 15: Prepare the datasets
+
+| Command | Does |
+|---|---|
+| `python -m woofdata.prepare` | Prepares every downloaded dataset, in `configs/datasets.yaml` order |
+| `python -m woofdata.prepare <id>` | Prepares one dataset |
+| `python -m woofdata.prepare --dry-run` | Lists each dataset, what is in `raw/` and what would be written; writes nothing |
+
+Each dataset is converted from `<data_dir>/raw/<id>/` into `<data_dir>/processed/<id>/`
+(16 kHz WAVs, images, COCO JSON, `labels.csv`, `rows.csv`). Then
+`<data_dir>/processed/manifest.csv` and the split files in `data/splits/` are rebuilt.
+
+- `raw/` is never changed, and rerunning replaces only `processed/<id>/`.
+- Prepare `stanford_dogs` before `stanfordextra`, `dog_pose` and `dogposecv`: they read its
+  `index.csv` and `boxes.csv`. Running without an id does this for you.
+
+### Step 16: Check the results
+
+Each dataset prints one line:
+
+| Line says | What to do |
+|---|---|
+| `done: … (fingerprint match)` | Nothing: your output is identical to the team's |
+| `done: … (fingerprint recorded)` | First time this dataset was prepared; commit `data/splits/` |
+| `WARNING: fingerprint differs …` | Your output differs from the team's: don't commit, post the line in the team chat |
+| `skipped (raw folder missing …)` | Download it first (Step 12) |
+| `no converter yet` | Nothing: this dataset is not prepared yet |
+
+Only after a converter was changed **on purpose**, accept the new output with
+`python -m woofdata.prepare <id> --update-fingerprints` and commit `data/splits/`.
+
+### Step 17: Verify against the team's fingerprints
+
+```bash
+python -m woofdata.prepare --check
+```
+
+**Check:** it prints `match`. Otherwise it lists each dataset that differs or was never
+prepared.
+
+### Step 18: Load a sample
+
+```python
+from woofdata.loader import load_sample
+from woofdata.tasks import task_rows
+
+rows = task_rows("pose", "train")             # manifest rows of one task and split
+sample = load_sample("pose", rows.iloc[0])    # image, box and keypoints
+```
+
+Tasks are `bark_detector`, `audio_context`, `audio_emotion`, `pose`, `posture` and
+`scene_objects` (see `src/woofdata/tasks.py`). For PyTorch, `wooftrainer.torch_datasets.TaskDataset`
+wraps the same rows (needs the `ml` extra).
+
+---
+
+## 5. Daily Workflow
 
 1. Activate the virtual environment (Step 6).
 2. Pull `main`, then create a branch for your task.
@@ -164,7 +232,7 @@ save it as `data/raw/licenses/<id>_<YYYY-MM-DD>.png`.
 
 ---
 
-## 5. Data Rules
+## 6. Data Rules
 
 | Rule | Details |
 |---|---|

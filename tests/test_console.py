@@ -8,7 +8,7 @@ import sys
 import pytest
 from dataset_downloader.logs import TABLE_COLUMNS, print_table
 
-from woofdecoder.data.console import use_utf8_output
+from woofdata.utils_console import use_utf8_output
 
 
 def cp949_stream() -> io.TextIOWrapper:
@@ -45,6 +45,8 @@ def test_summary_table_prints_on_cp949_after_use_utf8_output(
     print("prepare line with — and 🐶")
 
     stream.flush()
-    written = stream.buffer.getvalue().decode("utf-8")
+    buffer = stream.buffer
+    assert isinstance(buffer, io.BytesIO)
+    written = buffer.getvalue().decode("utf-8")
     assert "—" in written
     assert stream.encoding == "utf-8"

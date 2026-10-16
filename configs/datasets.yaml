@@ -1,11 +1,10 @@
-# Raw datasets for: python -m woofdecoder.data.download [id]
+# Raw datasets for: python -m woofdata.download [id]
 # No id downloads everything; an id downloads only that dataset
 # Files go to<data_dir>/raw/<id>/
 # Grouped by pipeline stage
 # approx_size_gb: expected size on disk (total ≈ 8 GB); the download check flags folders
 #   more than 10% smaller.
-# license_url: page that states the license; save it by hand into
-#   <data_dir>/licenses/<id>_license.md
+# license_url: page that states the license (captured by hand, not checked here)
 
 datasets:
   # --- Audio ---
@@ -37,7 +36,7 @@ datasets:
     approx_size_gb: 0.6
     license_url: https://github.com/karolpiczak/ESC-50#license
 
-  # Audio branch: training (situation labels for 4 of the 9 subtypes).
+  # Audio branch: training (situation labels for 3 of the 4 situation categories, plus other).
   - id: act_env
     name: "Barkopedia: dog barks labeled by activity and environment"
     link: https://huggingface.co/datasets/ArlingtonCL2/Barkopedia_Dog_Act_Env

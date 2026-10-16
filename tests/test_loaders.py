@@ -4,27 +4,21 @@ from __future__ import annotations
 
 import pickle
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
 from PIL import Image
 
-from woofdecoder.data.fileio import relative_data_path, write_csv
-from woofdecoder.data.loaders import crop_to_box, load_audio_segment, load_sample
-from woofdecoder.data.manifest import MANIFEST_FILENAME, ManifestRow, make_clip_id, rows_to_frame
-from woofdecoder.data.prepare.common import (
-    TARGET_SAMPLE_RATE,
-    add_coco_annotation,
-    add_coco_image,
-    new_coco,
-    save_frame_targets,
-    write_coco,
-    write_labels,
-    write_sed_classes,
-    write_wav_16k,
-)
-from woofdecoder.data.prepare.stanfordextra import KEYPOINT_NAMES
-from woofdecoder.data.tasks import BarkDetectorSample, PoseSample, task_rows
+from woofdata.loader import crop_to_box, load_audio_segment, load_sample
+from woofdata.prepare.manifest import MANIFEST_FILENAME, ManifestRow, make_clip_id, rows_to_frame
+from woofdata.prepare.sources.stanfordextra import KEYPOINT_NAMES
+from woofdata.prepare.utils.audio import TARGET_SAMPLE_RATE, write_wav_16k
+from woofdata.prepare.utils.coco import add_coco_annotation, add_coco_image, new_coco, write_coco
+from woofdata.prepare.utils.label_files import write_labels, write_sed_classes
+from woofdata.prepare.utils.windows import save_frame_targets
+from woofdata.tasks import BarkDetectorSample, PoseSample, task_rows
+from woofdata.utils_fileio import relative_data_path, write_csv
 from woofdecoder.sed_classes import SED_CLASSES
 
 IMAGE_WIDTH: int = 80
@@ -38,11 +32,9 @@ def write_tone(path: Path, seconds: float) -> None:
     write_wav_16k(path, 0.5 * np.sin(2 * np.pi * 440.0 * times))
 
 
-def audio_row(
-    source: str, wav_path: Path, split: str, end_s: float, **fields: str | bool
-) -> ManifestRow:
+def audio_row(source: str, wav_path: Path, split: str, end_s: float, **fields: Any) -> ManifestRow:
     """Return one audio manifest row starting at 0 s."""
-    defaults = {"label_type": "call_type", "label_provenance": "expert"}
+    defaults: dict[str, Any] = {"label_type": "call_type", "label_provenance": "expert"}
     return ManifestRow(
         clip_id=make_clip_id(source, wav_path.name),
         source=source,
@@ -88,7 +80,7 @@ def make_act_env(data_dir: Path) -> list[ManifestRow]:
         15.0,
         label_type="context",
         label_provenance="vlm_video",
-        mapped_subtype="play",
+        mapped_category="playful_excited",
         eval_allowed=False,
     )
     label = {"clip_id": row.clip_id, "environment_normalized": "near door", "activity": "rest"}
@@ -183,7 +175,7 @@ def test_max_seconds_takes_the_centre(data_dir: Path) -> None:
 def test_audio_context_defaults_to_ten_seconds(data_dir: Path) -> None:
     sample = load_sample("audio_context", task_rows("audio_context", "train").iloc[0])
     assert sample.audio.shape == (10 * TARGET_SAMPLE_RATE,)
-    assert sample.mapped_subtype == "play"
+    assert sample.mapped_category == "playful_excited"
     assert sample.labels["environment_normalized"] == "near door"
 
 
@@ -223,6 +215,7 @@ def test_crop_to_box_moves_keypoints() -> None:
     keypoints = np.array([[30.0, 35.0, 2.0], [0.0, 0.0, 0.0]])
     crop, moved = crop_to_box(image, [10, 20, 40, 30], pad=1.0, keypoints=keypoints)
     assert crop.shape == (30, 40, 3)
+    assert moved is not None
     np.testing.assert_allclose(moved, [[20.0, 15.0, 2.0], [0.0, 0.0, 0.0]])
     assert crop[15, 20, 0] == 255
 
@@ -234,6 +227,7 @@ def test_crop_to_box_resizes_keypoints() -> None:
         image, [10, 20, 40, 30], pad=1.0, out_size=(80, 60), keypoints=keypoints
     )
     assert crop.shape == (60, 80, 3)
+    assert moved is not None
     np.testing.assert_allclose(moved, [[40.0, 30.0, 2.0]])
 
 
@@ -251,7 +245,7 @@ def test_crop_to_box_pads_outside_the_image() -> None:
 
 def test_task_dataset_pickles(data_dir: Path) -> None:
     pytest.importorskip("torch")
-    from woofdecoder.data.torch_datasets import TaskDataset
+    from wooftrainer.torch_datasets import TaskDataset
 
     dataset = TaskDataset("pose", "train")
     restored = pickle.loads(pickle.dumps(dataset))

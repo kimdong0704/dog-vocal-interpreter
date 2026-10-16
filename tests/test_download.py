@@ -5,22 +5,19 @@ None of these touch the network
 
 from __future__ import annotations
 
-import asyncio
-import os
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from dataset_downloader import Downloader
+from dataset_downloader.models import DatasetResult, Status
 
-from woofdecoder.config import get_data_dir, load_data_dir_from_env_file
-from woofdecoder.data import download
-from woofdecoder.data.download import (
+from woofdata.download import downloader
+from woofdata.download.datasets import load_datasets
+from woofdata.download.downloader import (
     download_all,
     download_one,
-    load_datasets,
     main,
-    print_file_event,
 )
 
 COMPLETE_ENV_FILE: str = (
@@ -40,7 +37,7 @@ def use_fake_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, run: object) -
     """Point the downloader at a temporary complete .env and data folder, and replace run()."""
     env_path = tmp_path / ".env"
     env_path.write_text(COMPLETE_ENV_FILE)
-    monkeypatch.setattr(download, "ENV_FILE", env_path)
+    monkeypatch.setattr(downloader, "ENV_FILE", env_path)
     # Set in the "terminal", so the repo's real .env is not read.
     monkeypatch.setenv("WOOFDECODER_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(Downloader, "run", run)
@@ -85,41 +82,6 @@ def test_providers_are_downloader_methods() -> None:
             assert callable(getattr(Downloader, dataset["provider"]))
 
 
-def test_get_data_dir_honors_env_var(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Test: WOOFDECODER_DATA_DIR overrides the default data folder."""
-    monkeypatch.setenv("WOOFDECODER_DATA_DIR", str(tmp_path))
-    assert get_data_dir() == tmp_path
-
-    monkeypatch.delenv("WOOFDECODER_DATA_DIR")
-    assert get_data_dir().name == "data"
-
-
-def test_env_file_sets_only_data_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Test: The .env loader sets WOOFDECODER_DATA_DIR but never a token."""
-    env_path = tmp_path / ".env"
-    env_path.write_text("HF_TOKEN=secret\nWOOFDECODER_DATA_DIR=D:/woof-data\n")
-    monkeypatch.delenv("WOOFDECODER_DATA_DIR", raising=False)
-    monkeypatch.delenv("HF_TOKEN", raising=False)
-
-    loaded = load_data_dir_from_env_file(env_path)
-
-    assert loaded
-    assert os.environ["WOOFDECODER_DATA_DIR"] == "D:/woof-data"
-    assert "HF_TOKEN" not in os.environ
-
-
-def test_env_file_does_not_override_terminal(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """Test: A WOOFDECODER_DATA_DIR already set in the terminal wins over .env."""
-    env_path = tmp_path / ".env"
-    env_path.write_text("WOOFDECODER_DATA_DIR=D:/woof-data\n")
-    monkeypatch.setenv("WOOFDECODER_DATA_DIR", "terminal")
-
-    assert load_data_dir_from_env_file(env_path) is False
-    assert os.environ["WOOFDECODER_DATA_DIR"] == "terminal"
-
-
 def test_no_id_queues_every_dataset(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Test: Without an id, every dataset is queued, each into <raw>/<id>."""
     assert queued_dataset_ids(monkeypatch, tmp_path, []) == all_dataset_ids()
@@ -154,7 +116,7 @@ def test_incomplete_env_file_exits_2(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     """Test: A .env file missing token entries (EnvFileError) exits with code 2."""
     env_path = tmp_path / ".env"
     env_path.write_text("HF_TOKEN=\n")
-    monkeypatch.setattr(download, "ENV_FILE", env_path)
+    monkeypatch.setattr(downloader, "ENV_FILE", env_path)
     monkeypatch.setenv("WOOFDECODER_DATA_DIR", str(tmp_path))
 
     assert main([]) == 2
@@ -185,48 +147,25 @@ def test_exit_code_follows_results(
     assert main(["act_env"]) == expected_code
 
 
-def library_like_run(
-    self: Downloader, progress: bool = True, on_event: object = None
-) -> list[object]:
-    """Fake run() that, like the library, calls asyncio.run() (fails inside a running loop).
-
-    Each result also records whether the live progress bar was asked for.
-    """
-    asyncio.run(asyncio.sleep(0))
-    results: list[object] = []
+def one_result_per_request_run(self: Downloader) -> list[DatasetResult]:
+    """Fake run() that returns one "ok" result per queued request."""
+    results: list[DatasetResult] = []
     for request in self.requests:
-        results.append(SimpleNamespace(status="ok", dest=request.dest, progress=progress))
+        results.append(DatasetResult(request, Status.OK))
     return results
-
-
-def test_download_one_works_inside_running_event_loop(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """Test: download_one works when called from a running event loop, as in Jupyter."""
-    use_fake_run(monkeypatch, tmp_path, library_like_run)
-
-    async def call_from_event_loop() -> list[object]:
-        return download_one("esc50")
-
-    results = asyncio.run(call_from_event_loop())
-
-    assert len(results) == 1
-    assert results[0].dest == "esc50"
-    # The live progress bar needs ipywidgets in Jupyter, so text lines are printed instead.
-    assert results[0].progress is False
 
 
 def test_download_all_returns_one_result_per_dataset(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Test: download_all queues every dataset and returns one result for each."""
-    use_fake_run(monkeypatch, tmp_path, library_like_run)
+    use_fake_run(monkeypatch, tmp_path, one_result_per_request_run)
 
     results = download_all()
 
     result_ids: list[str] = []
     for result in results:
-        result_ids.append(result.dest)
+        result_ids.append(result.request.dest)
     assert result_ids == all_dataset_ids()
 
 
@@ -234,12 +173,3 @@ def test_download_one_rejects_unknown_id() -> None:
     """Test: download_one raises ValueError for an id not in configs/datasets.yaml."""
     with pytest.raises(ValueError, match="Valid ids"):
         download_one("no_such_dataset")
-
-
-def test_print_file_event_shows_file_and_reason(capsys: pytest.CaptureFixture[str]) -> None:
-    """Test: A file event prints its name, dataset/path and reason on one line."""
-    task = SimpleNamespace(dataset="esc50", path="ESC-50.zip")
-
-    print_file_event("retry", task, {"attempt": 2, "reason": "timeout"})
-
-    assert capsys.readouterr().out == "    retry  esc50/ESC-50.zip  (timeout)\n"

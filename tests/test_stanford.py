@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from woofdecoder.data.download import load_datasets
-from woofdecoder.data.prepare import dogposecv, stanford_dogs, stanfordextra
-from woofdecoder.data.prepare.stanford_shared import hash_split, shared_split
+from woofdata.download.datasets import load_datasets
+from woofdata.prepare.sources import dogposecv, stanford_dogs, stanfordextra
+from woofdata.prepare.sources.stanford_shared import hash_split, shared_split
 
 
 def test_official_split_wins_over_the_hash() -> None:

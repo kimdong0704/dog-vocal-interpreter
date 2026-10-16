@@ -11,42 +11,30 @@ from woofdecoder.preprocess.segments import BarkSegment
 from woofdecoder.taxonomy import (
     CATEGORIES,
     DISPLAY_NAMES,
-    NUM_SUBTYPES,
-    SUBTYPES,
-    category_probs,
+    NUM_CATEGORIES,
+    OTHER_CATEGORY,
 )
 
 
 class UniformBranch(Branch):
-    """Test branch that always predicts the same probability for every subtype."""
+    """Test branch that always predicts the same probability for every category."""
 
     name = "uniform"
 
     def predict(self, segment: BarkSegment) -> BranchOutput:
         """Return uniform probabilities, ignoring the segment."""
-        uniform_probs = np.full(NUM_SUBTYPES, 1.0 / NUM_SUBTYPES)
+        uniform_probs = np.full(NUM_CATEGORIES, 1.0 / NUM_CATEGORIES)  # shape (NUM_CATEGORIES,)
         return BranchOutput(probs=uniform_probs)
 
 
 def test_taxonomy_is_consistent() -> None:
-    """Tests: All subtypes and categories have a display name."""
-    assert NUM_SUBTYPES == 9
-    assert len(SUBTYPES) == len(set(SUBTYPES))
+    """Tests: 5 unique categories, each with a display name, including OTHER_CATEGORY."""
+    assert NUM_CATEGORIES == 5
+    assert len(CATEGORIES) == len(set(CATEGORIES))
+    assert OTHER_CATEGORY in CATEGORIES
 
-    for subtype_name in SUBTYPES:
-        assert subtype_name in DISPLAY_NAMES
     for category_name in CATEGORIES:
         assert category_name in DISPLAY_NAMES
-
-
-def test_category_probs_sum_to_one() -> None:
-    """Tests: Category probabilities built from valid subtype probabilities sum to 1."""
-    random_generator = np.random.default_rng(seed=0)
-    subtype_probs = random_generator.dirichlet(np.ones(NUM_SUBTYPES))
-
-    probs_by_category = category_probs(subtype_probs)
-
-    assert sum(probs_by_category.values()) == pytest.approx(1.0)
 
 
 def test_branch_contract() -> None:
@@ -56,14 +44,14 @@ def test_branch_contract() -> None:
     output = UniformBranch().predict(segment)
 
     assert output.present
-    assert output.probs.shape == (NUM_SUBTYPES,)
+    assert output.probs.shape == (NUM_CATEGORIES,)
     assert BranchOutput.missing().present is False
 
 
 def test_branch_output_rejects_bad_probs() -> None:
     """Test: BranchOutput rejects probabilities that do not sum to 1."""
     with pytest.raises(ValueError):
-        BranchOutput(probs=np.ones(NUM_SUBTYPES))
+        BranchOutput(probs=np.ones(NUM_CATEGORIES))
 
 
 def test_config_loads() -> None:

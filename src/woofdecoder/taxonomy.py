@@ -1,39 +1,34 @@
-"""Label taxonomy: the single source of truth for subtypes and categories.
+"""Label taxonomy: the single source of truth for category names.
 
-Every model predicts probabilities over the same flat list of subtypes (SUBTYPES).
-A category's probability is the sum of its subtypes' probabilities.
+Every model predicts probabilities over the same flat list of 5 categories (CATEGORIES).
+The order of CATEGORIES is the order of every probability array.
 
-Never hard-code subtype or category names anywhere else; import them from here.
-If a subtype has too little data and must be merged into its parent category,
-that merge is done in this file only.
+OTHER_CATEGORY means the dog vocalizes, but not in one of the 4 situations
+(e.g. resting, bath). It does not mean "the model is unsure".
+
+Never hard-code category names anywhere else; import them from here.
 """
 
 from __future__ import annotations
 
-import numpy as np
+# The categories every model predicts. Order here defines the probability array order.
+CATEGORIES: list[str] = [
+    "alert_aggressive",
+    "playful_excited",
+    "distressed_lonely",
+    "attention_seeking",
+    "other",
+]
 
-# Each category and the subtypes that belong to it. Order here defines SUBTYPES order.
-CATEGORIES: dict[str, list[str]] = {
-    "alert_aggressive": ["stranger_alert", "threat", "fearful_defensive"],
-    "playful_excited": ["play", "greeting"],
-    "distressed_lonely": ["separation", "anxious_whining"],
-    "attention_seeking": ["demand", "interaction"],
-}
+# Position of each category in a probability array of shape (NUM_CATEGORIES,).
+CATEGORY_INDEX: dict[str, int] = {}
+for position, category_name in enumerate(CATEGORIES):
+    CATEGORY_INDEX[category_name] = position
 
-# Flat subtype list and subtype -> category lookup, built from CATEGORIES.
-SUBTYPES: list[str] = []
-SUBTYPE_TO_CATEGORY: dict[str, str] = {}
-for category_name, subtype_names in CATEGORIES.items():
-    for subtype_name in subtype_names:
-        SUBTYPES.append(subtype_name)
-        SUBTYPE_TO_CATEGORY[subtype_name] = category_name
+NUM_CATEGORIES: int = len(CATEGORIES)
 
-# Position of each subtype in a probability array of shape (NUM_SUBTYPES,).
-SUBTYPE_INDEX: dict[str, int] = {}
-for position, subtype_name in enumerate(SUBTYPES):
-    SUBTYPE_INDEX[subtype_name] = position
-
-NUM_SUBTYPES: int = len(SUBTYPES)
+# The vocalization happens outside the 4 situations above.
+OTHER_CATEGORY: str = "other"
 
 # Human-readable names shown in the app.
 DISPLAY_NAMES: dict[str, str] = {
@@ -41,37 +36,5 @@ DISPLAY_NAMES: dict[str, str] = {
     "playful_excited": "Playful / Excited",
     "distressed_lonely": "Distressed / Lonely",
     "attention_seeking": "Attention-seeking",
-    "stranger_alert": "Stranger alert",
-    "threat": "Threat / aggressive",
-    "fearful_defensive": "Fearful / defensive",
-    "play": "Play",
-    "greeting": "Greeting / owner arriving",
-    "separation": "Separation / lonely",
-    "anxious_whining": "Anxious / whining",
-    "demand": "Demand (food, walk, let out)",
-    "interaction": "Interaction with owner",
+    "other": "Other",
 }
-
-
-def category_probs(subtype_probs: np.ndarray) -> dict[str, float]:
-    """Sum subtype probabilities into category probabilities.
-
-    Args:
-        subtype_probs: Probabilities in SUBTYPES order, shape (NUM_SUBTYPES,).
-
-    Returns:
-        A dict mapping each category name to the sum of its subtypes' probabilities.
-    """
-    subtype_probs = np.asarray(subtype_probs, dtype=float)  # shape (NUM_SUBTYPES,)
-
-    result: dict[str, float] = {}
-    for category_name, subtype_names in CATEGORIES.items():
-        category_total = 0.0
-
-        for subtype_name in subtype_names:
-            position = SUBTYPE_INDEX[subtype_name]
-            category_total += subtype_probs[position]
-
-        result[category_name] = float(category_total)
-
-    return result
