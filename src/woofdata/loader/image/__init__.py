@@ -1,1 +1,1 @@
-"""Image loading: box crops and the image task loaders."""
+"""Image loading: the image task loaders. Box crops live in woofdecoder.preprocess.crops."""

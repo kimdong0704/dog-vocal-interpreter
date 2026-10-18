@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from woofdata.loader import crop_to_box, load_audio_segment, load_sample
+from woofdata.loader import load_audio_segment, load_sample
 from woofdata.prepare.manifest import MANIFEST_FILENAME, ManifestRow, make_clip_id, rows_to_frame
 from woofdata.prepare.sources.stanfordextra import KEYPOINT_NAMES
 from woofdata.prepare.utils.audio import TARGET_SAMPLE_RATE, write_wav_16k
@@ -19,6 +19,7 @@ from woofdata.prepare.utils.label_files import write_labels, write_sed_classes
 from woofdata.prepare.utils.windows import save_frame_targets
 from woofdata.tasks import BarkDetectorSample, PoseSample, task_rows
 from woofdata.utils_fileio import relative_data_path, write_csv
+from woofdecoder.preprocess.crops import crop_to_box
 from woofdecoder.sed_classes import SED_CLASSES
 
 IMAGE_WIDTH: int = 80
