@@ -4,7 +4,8 @@ import os
 import re
 from pathlib import Path
 
-REPO_ROOT: Path = Path(__file__).resolve().parents[2]
+from woofdecoder.config import REPO_ROOT
+
 DATA_DIR_ENV_VAR: str = "WOOFDECODER_DATA_DIR"
 ENV_FILE: Path = REPO_ROOT / ".env"
 
