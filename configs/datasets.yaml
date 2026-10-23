@@ -55,11 +55,14 @@ datasets:
 
   # --- Vision: pose ---
   # Pose: images for StanfordExtra labels.
+  # Kaggle mirror of the official images.tar + annotation.tar (no lists). Needs Kaggle keys.
   - id: stanford_dogs
-    name: "Stanford Dogs: 120 breeds, images, train/test lists and dog boxes"
-    link: http://vision.stanford.edu/aditya86/ImageNetDogs/main.html
-    # annotation.tar: the official dog bounding boxes, PASCAL VOC XML per image.
-    patterns: ["images.tar", "lists.tar", "annotation.tar"]
+    name: "Stanford Dogs: 120 breeds, images and dog boxes (Kaggle mirror)"
+    provider: kaggle
+    # annotations/: the official dog bounding boxes, PASCAL VOC XML per image.
+    args:
+      dataset: jessicali9530/stanford-dogs-dataset
+      version: 2
     approx_size_gb: 0.78
     license_url: http://vision.stanford.edu/aditya86/ImageNetDogs/main.html
 
