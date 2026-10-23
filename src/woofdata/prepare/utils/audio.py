@@ -10,6 +10,7 @@ import soundfile
 import soxr
 
 from woofdecoder.config import load_config
+from woofdecoder.preprocess.media import to_mono_16k
 
 TARGET_SAMPLE_RATE: int = load_config()["media"]["sample_rate"]
 WAV_ENCODING: str = "PCM_16"

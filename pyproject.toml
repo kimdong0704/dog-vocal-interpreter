@@ -9,11 +9,13 @@ description = "Multimodal dog vocalization interpreter: audio + body language + 
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "av",
     "numpy",
     "pandas",
     "pillow",
     "pyyaml",
     "soundfile",
+    "soxr", 
     "tqdm",
     "dataset-downloader @ git+https://github.com/kimdong0704/dataset-downloader.git@v0.1.0",
 ]
@@ -21,7 +23,7 @@ dependencies = [
 [project.optional-dependencies]
 ml = ["torch", "transformers", "huggingface_hub", "librosa", "scikit-learn"]
 # Data preparation: soxr resamples audio, pyarrow reads the AudioSet parquet files.
-data = ["soxr", "pyarrow"]
+data = ["pyarrow"]
 app = ["fastapi", "uvicorn[standard]", "python-multipart", "gradio"]
 dev = ["pytest", "ruff", "ipykernel", "nbstripout", "matplotlib"]
 [tool.setuptools.packages.find]
