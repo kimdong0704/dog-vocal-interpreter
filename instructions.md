@@ -206,8 +206,8 @@ prepared.
 from woofdata.loader import load_sample
 from woofdata.tasks import task_rows
 
-rows = task_rows("pose", "train")             # manifest rows of one task and split
-sample = load_sample("pose", rows.iloc[0])    # image, box and keypoints
+rows = task_rows("pose", "train")  # manifest rows of one task and split
+sample = load_sample("pose", rows.iloc[0])  # image, box and keypoints
 ```
 
 Tasks are `bark_detector`, `audio_context`, `audio_emotion`, `pose`, `posture` and

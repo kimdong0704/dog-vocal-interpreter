@@ -7,7 +7,6 @@ from pathlib import Path
 
 import numpy as np
 import soundfile
-import soxr
 
 from woofdecoder.config import load_config
 from woofdecoder.preprocess.media import to_mono_16k
@@ -15,7 +14,7 @@ from woofdecoder.preprocess.media import to_mono_16k
 TARGET_SAMPLE_RATE: int = load_config()["media"]["sample_rate"]
 WAV_ENCODING: str = "PCM_16"
 # soxr "HQ" quality: deterministic and good enough for 16 kHz speech-band audio.
-RESAMPLE_QUALITY: str = "HQ"
+# RESAMPLE_QUALITY: str = "HQ"
 
 
 def load_audio(source: str | Path | bytes) -> tuple[np.ndarray, int]:
@@ -31,25 +30,6 @@ def load_audio(source: str | Path | bytes) -> tuple[np.ndarray, int]:
         audio_file = source
     samples, sample_rate = soundfile.read(audio_file, dtype="float32", always_2d=True)
     return samples, sample_rate  # samples shape (num_samples, num_channels)
-
-
-def to_mono_16k(samples: np.ndarray, sample_rate: int) -> np.ndarray:
-    """Average the channels and resample to TARGET_SAMPLE_RATE with soxr.
-
-    Args:
-        samples: shape (num_samples,) or (num_samples, num_channels).
-        sample_rate: Sample rate of samples in Hz.
-
-    Returns:
-        float32 samples, shape (num_samples_16k,).
-    """
-    if samples.ndim == 2:
-        mono = samples.mean(axis=1)  # shape (num_samples,)
-    else:
-        mono = samples
-    if sample_rate != TARGET_SAMPLE_RATE:
-        mono = soxr.resample(mono, sample_rate, TARGET_SAMPLE_RATE, quality=RESAMPLE_QUALITY)
-    return mono.astype(np.float32, copy=False)  # shape (num_samples_16k,)
 
 
 def write_wav_16k(path: Path, samples: np.ndarray) -> None:
