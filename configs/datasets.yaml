@@ -97,6 +97,23 @@ datasets:
     approx_size_gb: 0.82
     license_url: https://huggingface.co/datasets/stockeh/dog-pose-cv
 
+    # Body branch: emotion labels for the pose decoder (angry / happy / relaxed / sad). Needs Kaggle keys.
+  - id: dog_emotion_kaggle
+    name: "Kaggle Dog Emotion: 4,000 dog photos labeled by emotion"
+    provider: kaggle
+    args:
+      dataset: danielshanbalico/dog-emotion
+      version: 1
+    approx_size_gb: 0.16
+    license_url: https://www.kaggle.com/datasets/danielshanbalico/dog-emotion
+
+    # Body branch: emotion labels for the pose decoder (aggressive / anxiety / fear). Needs a Roboflow key.
+  - id: rf_dog_emotion
+    name: "Roboflow Dog Emotion Dataset without Happy v1: video frames with emotion-labeled dog boxes"
+    link: https://universe.roboflow.com/dog-emotion-classification-rp9gv/dog-emotion-dataset-without-happy/dataset/1
+    approx_size_gb: 0.1
+    license_url: https://universe.roboflow.com/dog-emotion-classification-rp9gv/dog-emotion-dataset-without-happy 
+
   # --- Scene ---
   # Scene branch: leash evaluation (classes dog, leash, person). Needs a Roboflow key.
   - id: rf_leash
