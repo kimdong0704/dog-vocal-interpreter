@@ -23,7 +23,7 @@ def add_pretrained_sed_to_path()-> None:
     if str(PRETRAINED_SED_DIR) not in sys.path:
         sys.path.insert(0, str(PRETRAINED_SED_DIR))
 
-def download_checkpont(model_name: str, verbose: bool = True) -> Path:
+def download_checkpoint(model_name: str, verbose: bool = True) -> Path:
     path = CHECKPOINT_DIR / f"{model_name}_strong_1.pt"
     
     if path.is_file():

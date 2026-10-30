@@ -6,7 +6,7 @@ import torch
 
 from woofdecoder.branches.bark_detector.pretrained_sed import (
     add_pretrained_sed_to_path,
-    download_checkpont
+    download_checkpoint
 )
 from woofdecoder.sed_classes import SED_CLASSES
 
@@ -66,7 +66,7 @@ def load_bark_detector(
     model = PredictionsWrapper(frame_mn, checkpoint=None, embed_dim=embed_dim)
 
     # Load weights (the checkpoint has no mel_transform weights, so load non-strict)
-    checkpoint_path = download_checkpont(model_name, verbose)
+    checkpoint_path = download_checkpoint(model_name, verbose)
     state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
     missing, unexpected = model.load_state_dict(state_dict, strict=False)
     if unexpected or any("mel_transform" not in key for key in missing):
