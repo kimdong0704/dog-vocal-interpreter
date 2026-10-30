@@ -33,6 +33,16 @@ def frames_to_events(
         events.append((run_start * frame_s, len(active_frames) * frame_s))
     return events
 
+def events_to_frames(
+    events: list[Event], num_frames: int, frame_s: float = FRAME_S
+) -> np.ndarray:
+    # Opposite of frames_to_events: [(0.04, 0.12)] with 4 frames -> [F, T, T, F]
+    # lets frame metrics score the cleaned events
+    active_frames = np.zeros(num_frames, dtype=bool)
+    for start_s, end_s in events:
+        active_frames[round(start_s / frame_s): round(end_s / frame_s)] = True
+    return active_frames
+
 def smooth_probs(probs: np.ndarray, median_frames: int) -> np.ndarray:
     # [0.1, 0.9, 0.1, 0.1] -> [0.1, 0.1, 0.1, 0.1]
     # single high 40 ms frame = click/door/cough...

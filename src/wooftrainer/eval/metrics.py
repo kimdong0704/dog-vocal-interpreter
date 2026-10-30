@@ -38,3 +38,41 @@ def event_scores(true_frames: np.ndarray, predicted_frames: np.ndarray) -> dict[
     precision = safe_divide(predicted_correct, num_predicted)
     recall = safe_divide(true_found, num_true)
     return {"precision": precision, "recall": recall, "f1": f1_from(precision, recall), "num_true": num_true, "num_predicted": num_predicted}
+
+
+def matched_event_scores(true_frames: np.ndarray, predicted_frames: np.ndarray) -> dict[str, float]:
+    # Like event_scores, but each true event can match at most one predicted event and
+    # the other way round. event_scores lets one long predicted event "find" every true
+    # event it touches, so merging everything scores well; here it finds only one.
+    num_true = 0
+    num_predicted = 0
+    num_matched = 0
+
+    for true_row, predicted_row in zip(true_frames, predicted_frames):
+        true_events = frames_to_events(true_row)
+        predicted_events = frames_to_events(predicted_row)
+        num_true += len(true_events)
+        num_predicted += len(predicted_events)
+
+        # Greedy: pair up the biggest overlaps first
+        pairs = sorted(
+            (
+                (min(t[1], p[1]) - max(t[0], p[0]), t_index, p_index)
+                for t_index, t in enumerate(true_events)
+                for p_index, p in enumerate(predicted_events)
+                if overlaps(t, p)
+            ),
+            reverse=True,
+        )
+        used_true: set[int] = set()
+        used_predicted: set[int] = set()
+        for _, t_index, p_index in pairs:
+            if t_index in used_true or p_index in used_predicted:
+                continue
+            used_true.add(t_index)
+            used_predicted.add(p_index)
+            num_matched += 1
+
+    precision = safe_divide(num_matched, num_predicted)
+    recall = safe_divide(num_matched, num_true)
+    return {"precision": precision, "recall": recall, "f1": f1_from(precision, recall), "num_true": num_true, "num_predicted": num_predicted}

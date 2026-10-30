@@ -10,6 +10,7 @@
 from woofdecoder.branches.bark_detector.events import (
     DetectionSettings,
     drop_short_events,
+    events_to_frames,
     find_dog_events,
     frames_to_events,
     merge_close_events,
@@ -37,6 +38,7 @@ __all__ = [
     "SAMPLE_RATE",
     "detect_sed_probs",
     "drop_short_events",
+    "events_to_frames",
     "find_dog_events",
     "frames_to_events",
     "load_bark_detector",
