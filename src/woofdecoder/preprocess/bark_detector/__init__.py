@@ -7,7 +7,7 @@
     FRAME_S                        timing.py          0.04 s per frame
 """
 
-from woofdecoder.branches.bark_detector.events import (
+from woofdecoder.preprocess.bark_detector.events import (
     EVENT_CLASSES,
     DetectionSettings,
     drop_short_events,
@@ -19,18 +19,18 @@ from woofdecoder.branches.bark_detector.events import (
     vocal_score,
     settings_from_config
 )
-from woofdecoder.branches.bark_detector.model import (
+from woofdecoder.preprocess.bark_detector.model import (
     AUDIOSET_CLASSES_PER_SED,
     BarkDetector,
     load_bark_detector,
 )
-from woofdecoder.branches.bark_detector.predict import (
+from woofdecoder.preprocess.bark_detector.predict import (
     detect_sed_probs,
     predict_audioset_probs,
     to_sed_probs,
 )
-from woofdecoder.branches.bark_detector.pretrained_sed import PRETRAINED_SED_DIR
-from woofdecoder.branches.bark_detector.timing import FRAME_S, SAMPLE_RATE
+from woofdecoder.preprocess.bark_detector.pretrained_sed import PRETRAINED_SED_DIR
+from woofdecoder.preprocess.bark_detector.timing import FRAME_S, SAMPLE_RATE
 
 __all__ = [
     "AUDIOSET_CLASSES_PER_SED",
