@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import av
-import soxr
 import numpy as np
+import soxr
 
 from woofdecoder.config import load_config
 
@@ -35,12 +35,12 @@ def describe_media(path: str | Path, verbose: bool = True) -> dict:
         print(f"File: {Path(path).name}")
         print(f"Length: {info['duration_s']:.2f} s")
         if info["has_audio"]:
-            print(f"Audio")
+            print("Audio")
             print(f"{info['audio_sample_rate']:,} Hz")
             print(f"{info['audio_channels']} channel(s)")
         if info["has_video"]:
             width, height = info["video_size"]
-            print(f"Video")
+            print("Video")
             print(f"{info['video_fps']:,} fps")
             print(f"{width} , {height}")
     

@@ -272,3 +272,6 @@ docs/reference/*.pdf
 
 # Preprocessing SED model
 third_party/
+
+# vs code settings
+.vscode/

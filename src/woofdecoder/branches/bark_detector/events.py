@@ -5,8 +5,14 @@ from dataclasses import dataclass
 import numpy as np
 
 from woofdecoder.branches.bark_detector.timing import FRAME_S
+from woofdecoder.sed_classes import SED_CLASSES
+
 
 Event = tuple[float, float] # (start_s, end_s)
+
+EVENT_CLASSES: list[str] = ["bark", "growl", "whine", "howl", "other_vocal"]
+EVENT_COLUMNS: list[int] = [SED_CLASSES.index(name) for name in EVENT_CLASSES]
+SETTING_NAMES: list[str] = ["threshold", "median_frames", "max_gap_s", "min_event_s"]
 
 @dataclass(frozen=True)
 class DetectionSettings:
@@ -88,3 +94,20 @@ def find_dog_events(dog_prob: np.ndarray, settings: DetectionSettings) -> list[E
     events = frames_to_events(smoothed >= settings.threshold)
     events = merge_close_events(events, settings.max_gap_s)
     return drop_short_events(events, settings.min_event_s)
+
+def vocal_score(sed_probs: np.ndarray) -> np.ndarray:
+    return sed_probs[..., EVENT_COLUMNS].max(axis=-1)
+
+
+def settings_from_config(config: dict) -> DetectionSettings:
+    section = config["bark_detector"]
+    for name in SETTING_NAMES:
+        if section.get(name) is None:
+            raise ValueError(f"bark_detector.{name} is not set in configs/pipeline.yaml")
+    
+    return DetectionSettings(
+        threshold=float(section["threshold"]),
+        median_frames=int(section["median_frames"]),
+        max_gap_s=float(section["max_gap_s"]),
+        min_event_s=float(section["min_event_s"]),
+    )

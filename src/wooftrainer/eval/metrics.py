@@ -4,6 +4,7 @@ import numpy as np
 
 from woofdecoder.branches.bark_detector.events import frames_to_events
 
+
 def safe_divide(top: float, bottom: float) -> float:
     return top / bottom if bottom else 0.0
 
