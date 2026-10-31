@@ -79,7 +79,9 @@ def open_member(archive: zipfile.ZipFile | tarfile.TarFile, member_name: str) ->
     return member_file
 
 
-def extract_members(archive_path: Path, wanted: list[str] | str, out_dir: Path) -> list[Path]:
+def extract_members(
+    archive_path: Path, wanted: list[str] | str, out_dir: Path, strip_prefix: str = ""
+) -> list[Path]:
     """Extract only the wanted members of a zip or tar into out_dir, keeping their folders.
 
     Members already extracted with the right size are skipped, so reruns are fast.
@@ -88,16 +90,24 @@ def extract_members(archive_path: Path, wanted: list[str] | str, out_dir: Path) 
         archive_path: The .zip, .tar or .tar.gz file.
         wanted: Exact member names, or one glob pattern such as "Images/*.jpg".
         out_dir: Folder to extract into.
+        strip_prefix: Leading part of each member name to drop, such as "images/Images/",
+            so members land in out_dir directly without a later folder rename (which
+            Windows refuses while antivirus or an indexer holds a file in the folder).
 
     Returns:
         The extracted file paths, sorted by member name.
+
+    Raises:
+        ValueError: If a selected member does not start with strip_prefix.
     """
     member_sizes = list_archive_members(archive_path)
     selected = select_members(sorted(member_sizes), wanted)
     extracted_paths: list[Path] = []
     with open_archive(archive_path) as archive:
         for member_name in selected:
-            target_path = safe_member_path(out_dir, member_name)
+            if not member_name.startswith(strip_prefix):
+                raise ValueError(f"{member_name} does not start with {strip_prefix!r}")
+            target_path = safe_member_path(out_dir, member_name[len(strip_prefix) :])
             extracted_paths.append(target_path)
             if target_path.is_file() and target_path.stat().st_size == member_sizes[member_name]:
                 continue

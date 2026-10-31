@@ -43,7 +43,6 @@ IMAGES_PATTERN: str = "images/Images/*.jpg"
 ANNOTATIONS_PATTERN: str = "annotations/Annotation/*"
 ARCHIVE_IMAGES_FOLDER: str = "images/Images"
 IMAGES_DIRNAME: str = "images"
-EXTRACT_DIRNAME: str = "extract"
 STANFORDEXTRA_SOURCE: str = "stanfordextra"
 INDEX_COLUMNS: list[str] = [
     "image_key",
@@ -64,14 +63,15 @@ VocAnnotation = tuple[int, int, list[Box]]  # image width, height, dog boxes
 def extract_images(raw_dir: Path, out_dir: Path) -> list[Path]:
     """Extract every image to out_dir/images/<wnid>-<breed>/<key>.jpg; return the paths.
 
-    The archive folder is "images/Images"; it is moved up and renamed to lower case so
-    paths read the same on case-sensitive and case-insensitive file systems.
+    The archive folder is "images/Images"; it is stripped and replaced by lower case
+    "images" so paths read the same on case-sensitive and case-insensitive file systems.
     """
-    extract_dir = out_dir / EXTRACT_DIRNAME
-    extract_members(raw_dir / ARCHIVE, IMAGES_PATTERN, extract_dir)
-    (extract_dir / ARCHIVE_IMAGES_FOLDER).rename(out_dir / IMAGES_DIRNAME)
-    (extract_dir / ARCHIVE_IMAGES_FOLDER).parent.rmdir()
-    extract_dir.rmdir()
+    extract_members(
+        raw_dir / ARCHIVE,
+        IMAGES_PATTERN,
+        out_dir / IMAGES_DIRNAME,
+        strip_prefix=ARCHIVE_IMAGES_FOLDER + "/",
+    )
     return sorted((out_dir / IMAGES_DIRNAME).glob("*/*.jpg"))
 
 

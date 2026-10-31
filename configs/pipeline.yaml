@@ -8,8 +8,16 @@ media:
 
 # Bark detector (decided in notebook 10).
 bark_detector:
-  model: null
-  threshold: null
+  model: frame_mn10
+  threshold: 0.08       
+  median_frames: 1     
+  max_gap_s: 0.0   
+  min_event_s: 0.16  
+
+# Dog detector (decided in notebook 15).
+dog_detector:
+  model: nano
+  score_threshold: 0.5
 
 branches:
   # Audio branch (decided in notebooks 20 and 21).

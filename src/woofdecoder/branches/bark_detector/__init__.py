@@ -8,6 +8,7 @@
 """
 
 from woofdecoder.branches.bark_detector.events import (
+    EVENT_CLASSES,
     DetectionSettings,
     drop_short_events,
     events_to_frames,
@@ -15,6 +16,8 @@ from woofdecoder.branches.bark_detector.events import (
     frames_to_events,
     merge_close_events,
     smooth_probs,
+    vocal_score,
+    settings_from_config
 )
 from woofdecoder.branches.bark_detector.model import (
     AUDIOSET_CLASSES_PER_SED,
@@ -31,11 +34,12 @@ from woofdecoder.branches.bark_detector.timing import FRAME_S, SAMPLE_RATE
 
 __all__ = [
     "AUDIOSET_CLASSES_PER_SED",
-    "BarkDetector",
-    "DetectionSettings",
     "FRAME_S",
     "PRETRAINED_SED_DIR",
     "SAMPLE_RATE",
+    "EVENT_CLASSES",
+    "BarkDetector",
+    "DetectionSettings",
     "detect_sed_probs",
     "drop_short_events",
     "events_to_frames",
@@ -46,4 +50,6 @@ __all__ = [
     "predict_audioset_probs",
     "smooth_probs",
     "to_sed_probs",
+    "vocal_score",
+    "settings_from_config"
 ]

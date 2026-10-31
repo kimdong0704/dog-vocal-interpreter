@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ml = ["torch", "torchaudio", "torchvision", "transformers", "huggingface_hub", "librosa", "scikit-learn"]
+ml = ["torch", "torchaudio", "torchvision", "transformers", "huggingface_hub", "librosa", "scikit-learn", "rfdetr"]
 # Data preparation: soxr resamples audio, pyarrow reads the AudioSet parquet files.
 data = ["pyarrow"]
 app = ["fastapi", "uvicorn[standard]", "python-multipart", "gradio"]
