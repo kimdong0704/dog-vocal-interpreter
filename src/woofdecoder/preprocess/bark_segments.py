@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from woofdecoder.branches.bark_detector import (
+from woofdecoder.preprocess.bark_detector import (
     FRAME_S,
     BarkDetector,
     DetectionSettings,

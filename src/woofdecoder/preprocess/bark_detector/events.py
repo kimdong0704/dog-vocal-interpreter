@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from woofdecoder.branches.bark_detector.timing import FRAME_S
+from woofdecoder.preprocess.bark_detector.timing import FRAME_S
 from woofdecoder.sed_classes import SED_CLASSES
 
 

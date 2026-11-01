@@ -160,3 +160,65 @@ class BarkSegment:
             if box is not None:
                 return True
         return False
+
+    def print_segment(self, title: str = "", show_frames: bool = False) -> None:
+        """Print everything in the segment as a readable summary.
+
+        Args:
+            title: Optional heading, e.g. "Segment 2/5". Defaults to "BarkSegment".
+            show_frames: If True, also print one line per frame with its time and dog box.
+        """
+        heading = title or "BarkSegment"
+        if self.source_id:
+            heading += f"  [{self.source_id}]"
+        print(heading)
+        print("-" * max(len(heading), 40))
+
+        print(f"  {'time':<12}{self.start_s:.2f} - {self.end_s:.2f} s  ({self.duration_s:.2f} s)")
+
+        confidence_text = "unknown" if self.confidence is None else f"{self.confidence:.2f}"
+        print(f"  {'confidence':<12}{confidence_text}")
+
+        if self.has_audio:
+            audio_text = f"{self.audio.size} samples @ {self.sample_rate} Hz"
+        else:
+            audio_text = "none"
+        print(f"  {'audio':<12}{audio_text}")
+
+        if self.has_video:
+            height, width = self.frames[0].shape[:2]
+            video_text = (
+                f"{len(self.frames)} frames, {width}x{height}, "
+                f"{self.frame_times_s[0]:.2f} - {self.frame_times_s[-1]:.2f} s"
+            )
+        else:
+            video_text = "none"
+        print(f"  {'video':<12}{video_text}")
+
+        if self.has_dog_boxes:
+            num_with_dog = sum(box is not None for box in self.dog_boxes)
+            dog_text = f"dog in {num_with_dog}/{len(self.dog_boxes)} frames"
+        else:
+            dog_text = "not run"
+        print(f"  {'dog boxes':<12}{dog_text}")
+
+        print(f"  sound sections ({len(self.sound_sections)}):")
+        if not self.sound_sections:
+            print("    none")
+        for label, (section_start_s, section_end_s), score in self.sound_sections:
+            section_length_s = section_end_s - section_start_s
+            print(
+                f"    {label:<12}{section_start_s:6.2f} - {section_end_s:6.2f} s  "
+                f"({section_length_s:.2f} s)  score {score:.2f}"
+            )
+
+        if show_frames and self.has_video:
+            print("  frames:")
+            for frame_index, frame_time_s in enumerate(self.frame_times_s):
+                box = self.dog_boxes[frame_index] if self.has_dog_boxes else None
+                if box is None:
+                    box_text = "no dog" if self.has_dog_boxes else ""
+                else:
+                    x, y, w, h = box
+                    box_text = f"dog at x={x:.0f} y={y:.0f} w={w:.0f} h={h:.0f}"
+                print(f"    {frame_index:>3}  {frame_time_s:6.2f} s  {box_text}")

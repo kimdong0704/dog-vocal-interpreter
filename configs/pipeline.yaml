@@ -4,7 +4,7 @@
 # Shared media settings (decided in notebook 10).
 media:
   sample_rate: 16000
-  frames_per_segment: 4
+  frames_per_segment: 10
 
 # Bark detector (decided in notebook 10).
 bark_detector:

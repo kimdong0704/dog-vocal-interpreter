@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import torch
 
-from woofdecoder.branches.bark_detector.pretrained_sed import (
+from woofdecoder.preprocess.bark_detector.pretrained_sed import (
     add_pretrained_sed_to_path,
     download_checkpoint,
 )
