@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
 
 import torch
 
@@ -22,20 +21,13 @@ AUDIOSET_CLASSES_PER_SED: dict[str, list[str]] = {
     "other_vocal": ["Dog", "Canidae, wild dogs, wolves"],
 }
 
-class SEDModel(Protocol):
-    # What we use from PretrainedSED's PredictionsWrapper (imported at runtime, so the type checker can't see it)
-
-    def mel_forward(self, audio: torch.Tensor, /) -> torch.Tensor: ...
-    def __call__(self, mel: torch.Tensor, /) -> tuple[torch.Tensor, torch.Tensor]: ...
-
-
 @dataclass
 class BarkDetector:
     # The loaded SED model + what is needed to read its outputs as we wanted
-
-    model: SEDModel
+    
+    model: torch.nn.Module
     class_names: list[str] # 447 Audioset strong classes, in output order
-    columns_per_sed: dict[str, list[int]] # SED class -> its columns in the 447 outputs 
+    columns_per_sed: dict[str, list[str]] # SED class -> its columns in the 447 outputs 
     device: torch.device
 
 
