@@ -22,8 +22,11 @@ dog_detector:
 branches:
   # Audio branch (decided in notebooks 20 and 21).
   audio:
-    encoder: null
-    head: null
+    encoder: beats_iter3_plus_as2m
+    layer: null
+    min_seconds: 1.0
+    chunk_seconds: 10.0
+    batch_size: 1
 
   # Body-language branch (decided in notebooks 30 and 31).
   body:
