@@ -27,7 +27,21 @@ from woofdata.prepare.utils.label_files import (
 )
 from woofdata.prepare.utils.windows import events_to_frame_targets, make_windows, save_frame_targets
 from woofdata.utils_fileio import relative_data_path
-from woofdecoder.sed_classes import AUDIOSET_TO_SED, SED_CLASSES
+from woofdecoder.taxonomy import SED_CLASSES
+
+# AudioSet strong-label event names. AudioSet "Pant" is a human breathing class, so it is
+# left out on purpose and must never map to pant.
+AUDIOSET_TO_SED: dict[str, str] = {
+    "Bark": "bark",
+    "Yip": "bark",
+    "Bow-wow": "bark",
+    "Growling": "growl",
+    "Whimper (dog)": "whine",
+    "Howl": "howl",
+    "Bay": "howl",
+    "Dog": "other_vocal",
+    "Canidae, dogs, wolves": "other_vocal",
+}
 
 SOURCE: str = "audioset_strong_eval"
 PARQUET_PATTERN: str = "data/eval-*.parquet"

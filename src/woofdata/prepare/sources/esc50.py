@@ -20,7 +20,7 @@ from woofdata.prepare.utils.audio import convert_audio
 from woofdata.prepare.utils.label_files import write_events, write_labels, write_sed_classes
 from woofdata.prepare.utils.windows import events_to_frame_targets, make_windows, save_frame_targets
 from woofdata.utils_fileio import read_csv, relative_data_path
-from woofdecoder.sed_classes import SED_CLASSES
+from woofdecoder.taxonomy import SED_CLASSES
 
 SOURCE: str = "esc50"
 ARCHIVE_FILENAME: str = "ESC-50.zip"

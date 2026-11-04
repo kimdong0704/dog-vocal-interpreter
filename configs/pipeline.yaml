@@ -4,18 +4,29 @@
 # Shared media settings (decided in notebook 10).
 media:
   sample_rate: 16000
-  frames_per_segment: 4
+  frames_per_segment: 10
 
 # Bark detector (decided in notebook 10).
 bark_detector:
-  model: null
-  threshold: null
+  model: frame_mn10
+  threshold: 0.08       
+  median_frames: 1     
+  max_gap_s: 0.0   
+  min_event_s: 0.16  
+
+# Dog detector (decided in notebook 15).
+dog_detector:
+  model: nano
+  score_threshold: 0.5
 
 branches:
   # Audio branch (decided in notebooks 20 and 21).
   audio:
-    encoder: null
-    head: null
+    encoder: beats_iter3_plus_as2m
+    layer: null
+    min_seconds: 1.0
+    chunk_seconds: 10.0
+    batch_size: 1
 
   # Body-language branch (decided in notebooks 30 and 31).
   body:
