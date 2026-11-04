@@ -128,3 +128,12 @@ datasets:
     link: https://universe.roboflow.com/eyedetection-s8fd9/cat-dog-bowl-ncx2x/dataset/20
     approx_size_gb: 1.0
     license_url: https://universe.roboflow.com/eyedetection-s8fd9/cat-dog-bowl-ncx2x/dataset/20
+
+  # Self-labeled
+  # For fusion model training and missing category types for (audio branch heads, ...)
+  - id: self_labeled
+    name: "Self-labeled dog videos (team-collected, per-collection labels.csv)"
+    provider: manual
+    # Minimum expected size; grows as collections are added, so only "too small" is checked.
+    approx_size_gb: 0.1
+    license_url: https://www.youtube.com/static?template=terms

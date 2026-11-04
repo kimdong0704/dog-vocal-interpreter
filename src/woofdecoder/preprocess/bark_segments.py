@@ -13,7 +13,7 @@ from woofdecoder.preprocess.bark_detector import (
     find_dog_events,
     vocal_score
 )
-from woofdecoder.preprocess.media import TARGET_SAMPLE_RATE, load_audio_16k, sample_frames
+from woofdecoder.preprocess.media import TARGET_SAMPLE_RATE, cut_audio, load_audio_16k, sample_frames
 from woofdecoder.preprocess.segments import BarkSegment, SoundSection
 from woofdecoder.taxonomy import SED_CLASSES
 
@@ -57,13 +57,6 @@ def find_sound_sections(
         sections.append(SoundSection(label, span_s, score))
 
     return sections
-
-def cut_audio(audio: np.ndarray, start_s: float, end_s: float) -> np.ndarray:
-    first = round(start_s * TARGET_SAMPLE_RATE)
-    last = round(end_s * TARGET_SAMPLE_RATE)
-
-    return audio[first:last].copy()
-
 
 def frame_range(start_s: float, end_s: float) -> slice:
     return slice(round(start_s / FRAME_S), round(end_s / FRAME_S))

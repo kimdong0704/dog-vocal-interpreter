@@ -111,12 +111,18 @@ class Task:
     sample_type: type
     default_max_seconds: float | None = None  # audio is centre-cropped to this length
     train_splits: tuple[str, ...] = TRAIN_SPLITS
+    self_labeled_collection: tuple[str, ...] = ()
 
 
 TASKS: dict[str, Task] = {
     "bark_detector": Task(("playpant", "audioset_strong_eval", "esc50"), BarkDetectorSample),
     # Act_Env trains (all train_only); PlayPanT (category playful_excited) is the val / test set.
-    "audio_context": Task(("act_env", "playpant"), AudioContextSample, CLIP_MAX_SECONDS),
+    "audio_context": Task(
+        ("act_env", "playpant", "self_labeled"), 
+        AudioContextSample, 
+        CLIP_MAX_SECONDS, 
+        self_labeled_collection=("audio_distressedlonely",)
+    ),
     "audio_emotion": Task(("emotional_canines",), AudioEmotionSample, CLIP_MAX_SECONDS),
     "pose": Task(("stanfordextra",), PoseSample),
     "posture": Task(("dogposecv",), PostureSample),
@@ -161,6 +167,19 @@ def read_manifest() -> pd.DataFrame:
         raise FileNotFoundError(f"{manifest_path} is missing; run woofdata.prepare")
     return read_manifest_file(manifest_path)
 
+def clip_collection(clip_id: str) -> str:
+    """Return the collection of a self_labeled clip id, "self_labeled/<collection>/<video>..."."""
+    return clip_id.split("/")[1]
+
+def drop_unlisted_collections(rows: pd.DataFrame, collections: tuple[str, ...]) -> pd.DataFrame:
+    """Drop self_labeled rows whose collection is not listed; other sources are all kept."""
+    keep: list[bool] = []
+    for source, clip_id in zip(rows["source"], rows["clip_id"], strict=True):
+        if source != "self_labeled":
+            keep.append(True)
+        else:
+            keep.append(clip_collection(clip_id) in collections)
+    return rows.loc[np.array(keep, dtype=bool)]
 
 def task_rows(
     task: str, split: str, eval_only: bool = False, sources: list[str] | None = None
@@ -195,4 +214,9 @@ def task_rows(
     keep = manifest["source"].isin(sources) & manifest["split"].isin(wanted_splits)
     if eval_only:
         keep = keep & manifest["eval_allowed"]
-    return manifest.loc[keep].reset_index(drop=True)
+    
+    rows = manifest.loc[keep]
+    if "self_labeled" in sources:
+        rows = drop_unlisted_collections(rows, task_info.self_labeled_collection)
+    
+    return rows.reset_index(drop=True)
