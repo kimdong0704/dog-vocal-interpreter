@@ -7,7 +7,7 @@ from typing import NamedTuple
 
 import numpy as np
 
-from woofdecoder.sed_classes import SED_CLASSES
+from woofdecoder.taxonomy import SED_CLASSES
 
 TIME_TOLERANCE_S: float = 1e-3
 

@@ -15,7 +15,7 @@ from woofdecoder.preprocess.bark_detector import (
 )
 from woofdecoder.preprocess.media import TARGET_SAMPLE_RATE, load_audio_16k, sample_frames
 from woofdecoder.preprocess.segments import BarkSegment, SoundSection
-from woofdecoder.sed_classes import SED_CLASSES
+from woofdecoder.taxonomy import SED_CLASSES
 
 # Other_vocal is the fallback (see pick_event_class).
 SPECIFIC_CLASSES: list[str] = ["bark", "growl", "whine", "howl"]

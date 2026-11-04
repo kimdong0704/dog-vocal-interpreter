@@ -7,7 +7,7 @@ import torch
 
 from woofdecoder.preprocess.bark_detector.model import BarkDetector
 from woofdecoder.preprocess.bark_detector.timing import CHUNK_SAMPLES, SAMPLES_PER_FRAME
-from woofdecoder.sed_classes import SED_CLASSES
+from woofdecoder.taxonomy import SED_CLASSES
 
 CHUNKS_PER_BATCH: int = 8
 

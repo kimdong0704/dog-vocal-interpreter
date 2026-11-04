@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from woofdecoder.preprocess.bark_detector.timing import FRAME_S
-from woofdecoder.sed_classes import SED_CLASSES
+from woofdecoder.taxonomy import SED_CLASSES
 
 
 Event = tuple[float, float] # (start_s, end_s)

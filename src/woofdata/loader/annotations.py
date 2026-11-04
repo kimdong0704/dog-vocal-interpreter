@@ -17,7 +17,7 @@ from woofdata.path import data_path
 from woofdata.prepare.manifest import processed_dir
 from woofdata.prepare.utils.label_files import LABELS_FILENAME
 from woofdata.utils_fileio import read_csv
-from woofdecoder.sed_classes import SED_CLASSES
+from woofdecoder.taxonomy import SED_CLASSES
 
 
 class Row(Protocol):
