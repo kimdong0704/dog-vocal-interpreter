@@ -8,7 +8,7 @@ from woofdecoder.preprocess.bark_detector.pretrained_sed import (
     add_pretrained_sed_to_path,
     download_checkpoint,
 )
-from woofdecoder.sed_classes import SED_CLASSES
+from woofdecoder.taxonomy import SED_CLASSES
 
 DEFAULT_MODEL_NAME: str = "frame_mn10"
 

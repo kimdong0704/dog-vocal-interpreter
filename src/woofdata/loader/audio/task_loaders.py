@@ -12,7 +12,7 @@ from woofdata.prepare.sources import esc50
 from woofdata.prepare.utils.label_files import SED_CLASSES_FILENAME
 from woofdata.prepare.utils.windows import DEFAULT_FRAME_S, DEFAULT_WINDOW_S
 from woofdata.tasks import AudioContextSample, AudioEmotionSample, BarkDetectorSample
-from woofdecoder.sed_classes import SED_CLASSES
+from woofdecoder.taxonomy import SED_CLASSES
 
 NUM_FRAMES: int = round(DEFAULT_WINDOW_S / DEFAULT_FRAME_S)  # 250 frames per 10 s window
 
