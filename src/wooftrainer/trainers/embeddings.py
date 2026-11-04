@@ -7,11 +7,12 @@ import numpy as np
 import pandas as pd
 
 from woofdata.path import data_path, load_data_dir_from_env_file
-from woofdata.tasks import AudioContextSample, AudioEmotionSample
+from woofdata.tasks import AudioContextSample, AudioEmotionSample, task_rows
 from woofdecoder.branches.audio import AudioEncoder
 from wooftrainer.torch_datasets import TaskDataset
 
 CACHE_DIR: str = "cache/audio_embeddings"
+MANIFEST_LABEL_COLUMNS: list[str] = ["source", "dog_id", "mapped_category"]
 
 def cache_path(task: str, split: str, encoder_name: str) -> Path:
     load_data_dir_from_env_file()
@@ -45,26 +46,50 @@ def read_cache_file(path: Path) -> tuple[list[str], list[np.ndarray], list[dict]
         labels = [json.loads(text) for text in data["labels_json"]]
     return clip_ids, embeddings, labels
  
- 
 def cache_embeddings(
     task: str, split: str, encoder: AudioEncoder, save_every: int = 500, verbose: bool = True
 ) -> Path:
-    path = cache_path(task, split, encoder.name)
-    if path.is_file():
-        if verbose:
-            print(f"{task} {split}: already cached ({path.name})")
-        return path
+    """Bring the cache of task_rows(task, split) up to date and return its path.
  
-    dataset = TaskDataset(task, split)
+    Starts from the cached clips (an interrupted .partial file first, else the finished
+    file), drops clips the task no longer has, and embeds only the missing ones with the
+    same embed_waveforms the app uses. Nothing to do -> returns at once.
+ 
+    Raises:
+        ValueError: If the task split has no rows, or a clip cannot be embedded.
+    """
+    path = cache_path(task, split, encoder.name)
     partial_path = path.with_name(path.stem + ".partial.npz")
+    dataset = TaskDataset(task, split)
+ 
+    cached_ids: list[str] = []
+    cached_embeddings: list[np.ndarray] = []
+    cached_labels: list[dict] = []
+    if partial_path.is_file():
+        cached_ids, cached_embeddings, cached_labels = read_cache_file(partial_path)
+    elif path.is_file():
+        cached_ids, cached_embeddings, cached_labels = read_cache_file(path)
+ 
+    wanted_ids = set(dataset.rows["clip_id"])
     clip_ids: list[str] = []
     embeddings: list[np.ndarray] = []
     labels: list[dict] = []
-    if partial_path.is_file():
-        clip_ids, embeddings, labels = read_cache_file(partial_path)
+    for clip_id, embedding, label in zip(cached_ids, cached_embeddings, cached_labels, strict=True):
+        if clip_id in wanted_ids:
+            clip_ids.append(clip_id)
+            embeddings.append(embedding)
+            labels.append(label)
+    dropped_count = len(cached_ids) - len(clip_ids)
     done = set(clip_ids)
+    missing_count = len(wanted_ids) - len(done)
     if verbose:
-        print(f"{task} {split}: {len(dataset)} clips, {len(done)} already done")
+        print(
+            f"{task} {split}: {len(dataset)} clips, {len(done)} cached, "
+            f"{missing_count} to embed, {dropped_count} dropped"
+        )
+    if missing_count == 0 and dropped_count == 0 and path.is_file():
+        partial_path.unlink(missing_ok=True)
+        return path
  
     new_since_save = 0
     for index in range(len(dataset)):
@@ -90,8 +115,7 @@ def cache_embeddings(
         raise ValueError(f"{task} {split} has no rows")
     save_cache_file(path, clip_ids, embeddings, labels)
     partial_path.unlink(missing_ok=True)
-    return path
- 
+    return path 
  
 def load_embeddings(
     task: str, split: str, encoder_name: str
@@ -105,3 +129,30 @@ def load_embeddings(
     table = pd.DataFrame(labels)
     table.insert(0, "clip_id", clip_ids)
     return np.stack(embeddings).astype(np.float32), table
+
+def attach_labels(table: pd.DataFrame, task: str, split: str) -> pd.DataFrame:
+    """Return table with source, dog_id and mapped_category from the current manifest.
+ 
+    The cache's own copies of those columns are replaced, so a re-prepare or relabel can
+    never train on stale labels. Other cached columns (arousal, valence, labels.csv fields
+    such as num_windows) are kept. Row order follows table, so it still matches the
+    embeddings array.
+ 
+    Raises:
+        ValueError: If a cached clip is not in the task split (re-run cache_embeddings).
+    """
+    rows = task_rows(task, split)
+    kept_columns: list[str] = []
+    for column in table.columns:
+        if column not in MANIFEST_LABEL_COLUMNS:
+            kept_columns.append(column)
+    merged = table[kept_columns].merge(
+        rows[["clip_id"] + MANIFEST_LABEL_COLUMNS], on="clip_id", how="left", validate="one_to_one"
+    )
+    missing = merged["source"].isna()
+    if missing.any():
+        raise ValueError(
+            f"{int(missing.sum())} cached clips are not in {task} {split}; "
+            "re-run cache_embeddings"
+        )
+    return merged

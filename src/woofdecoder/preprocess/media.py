@@ -100,6 +100,12 @@ def load_audio_16k(path: str | Path, verbose: bool = True) -> np.ndarray | None:
     
     return mono
 
+def cut_audio(audio: np.ndarray, start_s: float, end_s: float) -> np.ndarray:
+    first = round(start_s * TARGET_SAMPLE_RATE)
+    last = round(end_s * TARGET_SAMPLE_RATE)
+
+    return audio[first:last].copy()
+
 def frame_times_in_segment(
     start_s: float,
     end_s: float,
