@@ -19,9 +19,11 @@ branches:
 
   # Body-language branch (decided in notebooks 30 and 31).
   body:
-    detector: null
-    pose: null
-    head: null
+    # Paths are relative to the repo root. Weights are NOT in git (models/ is ignored):
+    # copy them in by hand, or from /work/cssema416/202710/05/dog-vocal-interpreter/models/ on the server.
+    detector: null  # not separate: the pose model finds the dog box too
+    pose: models/pose/yolo11m-pose_full/weights/best.pt  # encoder, notebook 30
+    head: models/pose/decoder/pose_decoder_64.pt  # decoder, notebook 31 (64 features, lr 0.003)
 
   # Scene-context branch (decided in notebook 40).
   scene:
