@@ -61,8 +61,8 @@ Preprocessing ──► extract audio · detect bark segments · sample frames p
       ├──────────────────────┬───────────────────────┐
       ▼                      ▼                       ▼
  Audio model           Body-language model        Scene model
- pretrained audio      pretrained pose model →    zero-shot image-text model
- encoder               posture features           + object detector
+ pretrained audio      pretrained pose model →    frozen object detector
+ encoder               posture features           → pooled scene features
       └──────────────────────┼───────────────────────┘
                              ▼
                 Fusion model (+ calibration)
@@ -72,3 +72,12 @@ Preprocessing ──► extract audio · detect bark segments · sample frames p
 
 Every component starts from a **publicly available pretrained model** and is fine-tuned
 only as far as needed.
+
+## Scene encoder
+
+The frozen scene encoder lives in `src/woofdecoder/branches/scene.py`.
+Load it with `encoder_from_config(load_config())`, then call `encoder.embed(segment)`
+to get features for fusion. Its detector settings are in `configs/pipeline.yaml`.
+The scene features describe detected objects; fusion supplies the behavioral prediction.
+Use [notebook 41](notebooks/41_scene_training.ipynb) for image examples and checks.
+Cache helpers live in `src/wooftrainer/trainers/scene_embeddings.py`.

@@ -36,10 +36,13 @@ branches:
     pose: models/pose/yolo11m-pose_full/weights/best.pt  # encoder, notebook 30
     head: models/pose/decoder/pose_decoder_64.pt  # decoder, notebook 31 (64 features, lr 0.003)
 
-  # Scene-context branch (decided in notebook 40).
+  # Frozen scene encoder for fusion (checked in notebook 41).
   scene:
-    model: null
-    prompts: null
+    encoder: yoloe_object_pool_v1
+    model: models/scene/yoloe-11s-seg-pf.pt
+    confidence: 0.25
+    image_size: 640
+    max_objects: 32
 
 # Fusion of branch outputs (decided in notebook 50).
 fusion:
