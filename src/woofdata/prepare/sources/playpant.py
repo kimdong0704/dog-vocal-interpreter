@@ -37,7 +37,21 @@ from woofdata.prepare.utils.label_files import (
 )
 from woofdata.prepare.utils.windows import events_to_frame_targets, make_windows, save_frame_targets
 from woofdata.utils_fileio import relative_data_path
-from woofdecoder.sed_classes import PLAYPANT_TO_SED, SED_CLASSES
+from woofdecoder.taxonomy import SED_CLASSES
+
+# PlayPanT letter codes (06 Readme.txt). J (Sneeze), K (Shake) and L (Human
+# vocalizations) are left out: they are frames with no dog vocalization.
+PLAYPANT_TO_SED: dict[str, str] = {
+    "C": "bark",  # Bark / yelp
+    "A": "growl",  # Growl
+    "B": "whine",  # Whine
+    "G": "howl",  # Howl
+    "E": "pant",  # Pant
+    "D": "other_vocal",  # Moan
+    "F": "other_vocal",  # Cough / woof
+    "H": "other_vocal",  # Grunts
+    "I": "other_vocal",  # Other
+}
 
 SOURCE: str = "playpant"
 RECORDINGS_ARCHIVE: str = "03 Play session recordings.zip"

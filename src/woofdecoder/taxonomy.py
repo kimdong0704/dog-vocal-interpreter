@@ -1,10 +1,12 @@
-"""Label taxonomy: the single source of truth for category names.
+"""Label taxonomy: the single source of truth for category and sound-event class names.
 
 Every model predicts probabilities over the same flat list of 5 categories (CATEGORIES).
 The order of CATEGORIES is the order of every probability array.
 
 OTHER_CATEGORY means the dog vocalizes, but not in one of the 4 situations
 (e.g. resting, bath). It does not mean "the model is unsure".
+
+SED_CLASSES lists the sound-event classes the bark detector finds, in frame-target order.
 
 Never hard-code category names anywhere else; import them from here.
 """
@@ -38,3 +40,6 @@ DISPLAY_NAMES: dict[str, str] = {
     "attention_seeking": "Attention-seeking",
     "other": "Other",
 }
+
+# Column order of every frame-target array, shape (num_frames, len(SED_CLASSES)).
+SED_CLASSES: list[str] = ["bark", "growl", "whine", "howl", "pant", "other_vocal"]

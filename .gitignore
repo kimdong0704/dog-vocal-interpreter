@@ -269,3 +269,9 @@ kaggle.json
 
 # Reference papers: keep PDFs local, commit notes and links only
 docs/reference/*.pdf
+
+# Preprocessing SED model
+third_party/
+
+# vs code settings
+.vscode/
