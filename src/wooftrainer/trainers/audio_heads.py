@@ -37,6 +37,7 @@ MISSING_CLASS_LOGIT: float = -30.0
 
 DEFAULT_L2_VALUES: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0)
 NO_NUDGE: str = "none"  # the "no nudge" row of the nudge table
+MIN_NUDGE_GAIN: float = 0.01
 EMOTION_TASK: str = "audio_emotion"
 SITUATION_TASK: str = "audio_context"
 TRAIN_SPLIT: str = "train"
@@ -265,11 +266,12 @@ def choose_nudge_l2(
         results.append(result)
     
     table = pd.DataFrame(results)
-    best_l2 = table.loc[table["log_loss"].idxmin(), "l2"]
-    if best_l2 == NO_NUDGE:
+    nudged = table.loc[table["l2"] != NO_NUDGE]
+    best = nudged.loc[nudged["log_loss"].idxmin()]
+    gain = no_nudge["log_loss"] - best["log_loss"]
+    if gain < MIN_NUDGE_GAIN or best["macro_f1"] < no_nudge["macro_f1"]:
         return None, table
-    
-    return float(best_l2), table
+    return float(best["l2"]), table
  
  
 # --- Training all heads ---
