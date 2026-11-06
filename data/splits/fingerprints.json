@@ -56,10 +56,10 @@
   "sha1": "8ec97c95c15278fa705d96f63964ab6dd22801f0"
  },
  "self_labeled": {
-  "files": 36,
-  "labels_sha1": "c8105a317c1266a8d7d927dd9021e8db4c8609d2",
-  "rows": 75,
-  "sha1": "0527ae75880035d28b4192384f17fd9d13e62b89"
+  "files": 73,
+  "labels_sha1": "2dcf0157f86850ede4b326a75fd4fd2cad8ef072",
+  "rows": 124,
+  "sha1": "66b97b10f2d7945b80e9e4f4e87bbe8251c9537b"
  },
  "stanford_dogs": {
   "boxes_sha1": "0c10e17422231efffbaede362f0bddd0295221d6",
