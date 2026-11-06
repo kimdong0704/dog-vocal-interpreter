@@ -200,13 +200,14 @@ def fit_nudge_weights(
         
         true_class_probs = np.clip((probs * targets).sum(axis=1), 1e-12, None) # prediction number for true class
         # -mean(log_likelihood) --> cross-entropy loss
+        # weights are flattened weights (n, )
         # weights are clip weight * class weight, so we divide by weight_total to get the mean
         loss = -(weights * np.log(true_class_probs)).sum() / weight_total 
         loss += l2 * (nudge_weights**2).sum() # punish on large weights to avoid overfitting
         
-        # Single layer gradient: dL/dW = (probs - targets) * inputs
+        # Single layer gradient: dL/dW = (probs - targets) * inputs, dz
         logit_gradient = (probs - targets) * weights[:, np.newaxis] / weight_total
-        # dz
+        # delta
         gradient = logit_gradient.T @ inputs + 2 * l2 * nudge_weights
         
         return float(loss), gradient.ravel()
@@ -228,6 +229,7 @@ def out_of_fold_nudged_logits(
     l2: float,
 ) -> np.ndarray:
     nudged = logits.copy()
+    # Full batch gradient descent on each fold
     for train_index, held_out_index in folds:
         nudge_weights = fit_nudge_weights(
             logits[train_index],
@@ -275,8 +277,7 @@ def choose_nudge_l2(
  
 @dataclass
 class AudioHeads:
-    """Everything train_audio_heads produces.
- 
+    """
     Attributes:
         situation: The 5-category head; its temperature applies AFTER the nudge.
         arousal: Arousal head with its own temperature.
@@ -300,12 +301,10 @@ class AudioHeads:
  
  
 def prefixed_scores(prefix: str, scores: dict[str, float]) -> dict[str, float]:
-    """Return scores with each key prefixed, e.g. {"before_log_loss": ...}."""
     result: dict[str, float] = {}
     for key, value in scores.items():
         result[f"{prefix}_{key}"] = value
     return result
- 
  
 def train_emotion_head(
     embeddings: np.ndarray,
@@ -315,13 +314,6 @@ def train_emotion_head(
     encoder: str,
     C_values: tuple[float, ...],
 ) -> tuple[LinearHead, pd.DataFrame, dict]:
-    """Choose C, fit the temperature out-of-fold, then fit the head on every row.
- 
-    EmotionalCanines has no dog ids, so its folds are by clip (stratified by label).
- 
-    Returns:
-        (head, C table, summary row).
-    """
     features = select_layer(embeddings, layer)
     labels = table[target].to_numpy()
     weights = balanced_weights(labels, clip_weights(table))
@@ -339,33 +331,33 @@ def train_emotion_head(
     summary.update(prefixed_scores("after", score_probs(labels, after, classes, weights)))
     return head, c_table, summary
  
- 
 def train_audio_heads(
     encoder_name: str,
     layer: Layer,
     C_values: tuple[float, ...] = DEFAULT_C_VALUES,
     l2_values: tuple[float, ...] = DEFAULT_L2_VALUES,
 ) -> AudioHeads:
-    """Train the arousal, valence and situation heads and the emotion nudge on the
-    train splits' cached embeddings. Val and test are never read.
- 
-    Raises:
-        ValueError: If an audio_context train row has no mapped_category.
-    """
+    # Encoder -> embeddings for emotional heads
     emotion_x, emotion_table = load_embeddings(EMOTION_TASK, TRAIN_SPLIT, encoder_name)
     emotion_table = attach_labels(emotion_table, EMOTION_TASK, TRAIN_SPLIT)
+    
+    # Emotional heads
+    # Train arousal head 
     arousal, arousal_c, arousal_summary = train_emotion_head(
         emotion_x, emotion_table, "arousal", layer, encoder_name, C_values
     )
+    # Train valence head
     valence, valence_c, valence_summary = train_emotion_head(
         emotion_x, emotion_table, "valence", layer, encoder_name, C_values
     )
  
+    # Encoder -> embeddings for situation head
     context_x, context_table = load_embeddings(SITUATION_TASK, TRAIN_SPLIT, encoder_name)
     context_table = attach_labels(context_table, SITUATION_TASK, TRAIN_SPLIT)
     labels = context_table["mapped_category"].to_numpy()
     if (labels == "").any():
         raise ValueError(f"{int((labels == '').sum())} {SITUATION_TASK} rows have no category")
+    
     features = select_layer(context_x, layer)
     weights = balanced_weights(labels, clip_weights(context_table))
     folds = make_folds(labels, groups=context_table["dog_id"].to_numpy())
@@ -422,7 +414,6 @@ def train_audio_heads(
  
  
 def save_audio_heads(heads: AudioHeads, directory: Path) -> None:
-    """Write the three heads and the nudge into directory (models/audio/<encoder>/)."""
     heads.situation.save(directory / SITUATION_HEAD_FILENAME)
     heads.arousal.save(directory / AROUSAL_HEAD_FILENAME)
     heads.valence.save(directory / VALENCE_HEAD_FILENAME)
