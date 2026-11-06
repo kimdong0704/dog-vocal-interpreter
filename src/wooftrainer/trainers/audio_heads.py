@@ -61,6 +61,77 @@ def balanced_weights(labels: np.ndarray, sample_weight: np.ndarray) -> np.ndarra
         weights[in_class] *= total / (len(classes) * sample_weight[in_class].sum())
     return weights
 
+def source_balanced_weights(
+
+    labels: np.ndarray, sources: np.ndarray, sample_weight: np.ndarray
+
+) -> np.ndarray:
+
+    """Like balanced_weights, but inside each class every source also gets an equal share.
+ 
+    Every class still totals the same. Within a class with sources Act_Env and self_labeled,
+
+    each gets half of it, so "which source is this" cannot predict the class. Without this,
+
+    a class whose only examples come from one source (e.g. distressed_lonely, all YouTube)
+
+    teaches the head to recognise the source.
+
+    """
+
+    labels = np.asarray(labels)
+
+    sources = np.asarray(sources)
+
+    sample_weight = np.asarray(sample_weight, dtype=float)
+
+    classes = np.unique(labels)
+
+    total = sample_weight.sum()
+
+    weights = sample_weight.copy()
+
+    for class_name in classes:
+
+        in_class = labels == class_name
+
+        class_sources = np.unique(sources[in_class])
+
+        for source in class_sources:
+
+            in_group = in_class & (sources == source)
+
+            share = total / (len(classes) * len(class_sources))
+
+            weights[in_group] *= share / sample_weight[in_group].sum()
+
+    return weights
+
+def source_balanced_weights(
+    labels: np.ndarray, sources: np.ndarray, sample_weight: np.ndarray
+) -> np.ndarray:
+    # sources Act_Env and self_labeled each gets half
+    # Without this, learn to recognize the source
+   
+    labels = np.asarray(labels)
+    sources = np.asarray(sources)
+    sample_weight = np.asarray(sample_weight, dtype=float)
+    
+    classes = np.unique(labels)
+    total = sample_weight.sum()
+    weights = sample_weight.copy()
+    
+    for class_name in classes:
+        in_class = labels == class_name
+        class_sources = np.unique(sources[in_class])
+        
+        for source in class_sources:
+            in_group = in_class & (sources == source)
+            share = total / (len(classes) * len(class_sources))
+            weights[in_group] *= share / sample_weight[in_group].sum()
+            
+    return weights
+
 def fit_linear_head(
     features: np.ndarray,
     labels: np.ndarray,
@@ -338,6 +409,7 @@ def train_audio_heads(
     layer: Layer,
     C_values: tuple[float, ...] = DEFAULT_C_VALUES,
     l2_values: tuple[float, ...] = DEFAULT_L2_VALUES,
+    balance_sources: bool = True
 ) -> AudioHeads:
     # Encoder -> embeddings for emotional heads
     emotion_x, emotion_table = load_embeddings(EMOTION_TASK, TRAIN_SPLIT, encoder_name)
@@ -361,7 +433,17 @@ def train_audio_heads(
         raise ValueError(f"{int((labels == '').sum())} {SITUATION_TASK} rows have no category")
     
     features = select_layer(context_x, layer)
-    weights = balanced_weights(labels, clip_weights(context_table))
+    
+    # give each source equal shre inside each class (sitution head only)
+    if balance_sources:
+        weights = source_balanced_weights(
+            labels=labels,
+            sources=context_table["source"].to_numpy(),
+            sample_weight=clip_weights(context_table)
+        )
+    else:
+        weights = balanced_weights(labels, clip_weights(context_table))
+    
     folds = make_folds(labels, groups=context_table["dog_id"].to_numpy())
  
     best_C, situation_c = choose_C(features, labels, weights, folds, C_values)
@@ -390,6 +472,7 @@ def train_audio_heads(
         "C": best_C,
         "l2": NO_NUDGE if best_l2 is None else best_l2,
         "temperature": temperature,
+        "balance_sources": balance_sources
     }
     before = score_probs(labels, softmax(logits), classes, weights)
     final_probs = softmax(final_logits / temperature)

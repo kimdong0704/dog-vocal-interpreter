@@ -21,6 +21,7 @@ from woofdecoder.branches.audio.head import (
     softmax
 )
 from woofdecoder.branches.audio.features import LAYER_MEAN, Layer, check_layer, select_layer
+from woofdecoder.branches.audio.branch import AudioBranch, load_heads, to_categories_order
 
 
 __all__ = [
@@ -43,5 +44,8 @@ __all__ = [
     "AROUSAL_HEAD_FILENAME",
     "NUDGE_FILENAME",
     "SITUATION_HEAD_FILENAME",
-    "VALENCE_HEAD_FILENAME"
+    "VALENCE_HEAD_FILENAME",
+    "AudioBranch",
+    "load_heads",
+    "to_categories_order"
 ]

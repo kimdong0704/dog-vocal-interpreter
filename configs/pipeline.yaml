@@ -23,10 +23,12 @@ branches:
   # Audio branch (decided in notebooks 20 and 21).
   audio:
     encoder: beats_iter3_plus_as2m
-    layer: null
+    layer: mean
     min_seconds: 1.0
     chunk_seconds: 10.0
     batch_size: 1
+    heads_dir: models/audio
+    nudge_strength: 1.0 # rejection check from notebook 23
 
   # Body-language branch (decided in notebooks 30 and 31).
   body:
