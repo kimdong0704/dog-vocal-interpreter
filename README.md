@@ -79,5 +79,19 @@ The frozen scene encoder lives in `src/woofdecoder/branches/scene.py`.
 Load it with `encoder_from_config(load_config())`, then call `encoder.embed(segment)`
 to get features for fusion. Its detector settings are in `configs/pipeline.yaml`.
 The scene features describe detected objects; fusion supplies the behavioral prediction.
+It reuses preprocessing's RF-DETR dog detector to replace overlapping YOLOE detections
+with canonical dog boxes. Other YOLOE objects are retained. Dog-detector settings come
+from `dog_detector`; `branches.scene.dog_overlap_iou` controls matching. Both models run
+in inference mode. Rebuild older scene caches after this change.
 Use [notebook 41](notebooks/41_scene_training.ipynb) for image examples and checks.
 Cache helpers live in `src/wooftrainer/trainers/scene_embeddings.py`.
+
+Export already-preprocessed frames without a notebook:
+
+```powershell
+python -m wooftrainer.scene_export --manifest segments.json --output cache/scene.npz
+```
+
+The fusion teammate can load the exported features and align rows by segment ID
+without loading the detectors. See the [scene handoff guide](docs/scene_fusion.md)
+for the manifest, availability masks, and cache-loading API.

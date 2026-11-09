@@ -40,11 +40,12 @@ branches:
 
   # Frozen scene encoder for fusion (checked in notebook 41).
   scene:
-    encoder: yoloe_object_pool_v1
+    encoder: yoloe_rfdetr_object_pool_v2
     model: models/scene/yoloe-11s-seg-pf.pt
-    confidence: 0.25
+    confidence: 0.6
     image_size: 640
     max_objects: 32
+    dog_overlap_iou: 0.5  # prefer RF-DETR's dog label for matching YOLOE boxes
 
 # Fusion of branch outputs (decided in notebook 50).
 fusion:

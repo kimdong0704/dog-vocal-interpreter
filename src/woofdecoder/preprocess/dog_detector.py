@@ -20,7 +20,8 @@ class DogDetector:
 
 
 def load_dog_detector(
-    model_size: str = "nano", score_threshold: float = 0.5, verbose: bool = True
+    model_size: str = "nano", score_threshold: float = 0.5, verbose: bool = True,
+    device: str | None = None,
 ) -> DogDetector:
 
     from rfdetr import RFDETRNano, RFDETRSmall
@@ -33,7 +34,8 @@ def load_dog_detector(
     if verbose:
         print(f"Loading RF-DETR {model_size} (keeping only '{DOG_CLASS_NAME}')")
     
-    return DogDetector(model_classes[model_size](), score_threshold)
+    options = {"device": device} if device is not None else {}
+    return DogDetector(model_classes[model_size](**options), score_threshold)
 
 def detect_dogs(detector: DogDetector, frames: list[np.ndarray]) -> list[list[tuple[Box, float]]]:
     from rfdetr.assets.coco_classes import COCO_CLASSES
