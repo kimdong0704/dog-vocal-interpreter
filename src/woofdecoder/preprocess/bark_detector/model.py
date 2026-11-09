@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 from dataclasses import dataclass
 
 import torch
@@ -48,8 +50,10 @@ def find_columns(class_names: list[str]) -> dict[str, list[int]]:
 def load_bark_detector(
     model_name: str = DEFAULT_MODEL_NAME, 
     device: str | None = None,
-    verbose: bool = True
+    verbose: bool = True,
+    show_architecture: bool = False,
 ) -> BarkDetector:
+    # show_architecture: print the network layers (the third-party builder prints them).
     add_pretrained_sed_to_path()
     
     from data_util.audioset_classes import as_strong_train_classes
@@ -60,8 +64,12 @@ def load_bark_detector(
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    # Build Network
-    frame_mn = FrameMNWrapper(NAME_TO_WIDTH(model_name))
+    # Build Network (the third-party builder prints the whole architecture; hide it unless asked)
+    if show_architecture:
+        frame_mn = FrameMNWrapper(NAME_TO_WIDTH(model_name))
+    else:
+        with contextlib.redirect_stdout(io.StringIO()):
+            frame_mn = FrameMNWrapper(NAME_TO_WIDTH(model_name))
     embed_dim = frame_mn.state_dict()["frame_mn.features.16.1.bias"].shape[0]
     model = PredictionsWrapper(frame_mn, checkpoint=None, embed_dim=embed_dim)
 

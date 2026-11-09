@@ -46,7 +46,7 @@ BRANCH_ROLE: str = "branch"
 FUSION_ROLE: str = "fusion"
 # Every collection folder must be listed here, so a new one is added on purpose.
 COLLECTION_ROLES: dict[str, str] = {
-    "audio_distressedlonely": BRANCH_ROLE,
+    "audio": BRANCH_ROLE,
     "fusion": FUSION_ROLE,
 }
 # Role -> (test share, val share) of its dogs; the rest is train.
