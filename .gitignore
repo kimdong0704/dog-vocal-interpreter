@@ -242,6 +242,17 @@ models/*
 *.ckpt
 *.onnx
 *.safetensors
+# Body-branch weights ARE committed so BodyBranch works after a clone (agreed with Leo)
+!models/pose/
+models/pose/*
+!models/pose/decoder/
+models/pose/decoder/*
+!models/pose/decoder/pose_decoder_64.pt
+!models/pose/yolo11m-pose_full/
+models/pose/yolo11m-pose_full/*
+!models/pose/yolo11m-pose_full/weights/
+models/pose/yolo11m-pose_full/weights/*
+!models/pose/yolo11m-pose_full/weights/best.pt
 
 # Media and archives anywhere in the repo
 *.wav
