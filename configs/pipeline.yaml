@@ -27,16 +27,13 @@ branches:
     min_seconds: 1.0
     chunk_seconds: 10.0
     batch_size: 1
-    heads_dir: models/audio
+    heads_dir: models/audio/heads
     nudge_strength: 1.0 # rejection check from notebook 23
 
   # Body-language branch (decided in notebooks 30 and 31).
   body:
-    # Paths are relative to the repo root. Weights are NOT in git (models/ is ignored):
-    # copy them in by hand, or from /work/cssema416/202710/05/dog-vocal-interpreter/models/ on the server.
-    detector: null  # not separate: the pose model finds the dog box too
-    pose: models/pose/yolo11m-pose_full/weights/best.pt  # encoder, notebook 30
-    head: models/pose/decoder/pose_decoder_64.pt  # decoder, notebook 31 (64 features, lr 0.003)
+    pose: models/pose/yolo11m-pose_full/best.pt  # encoder, notebook 30
+    head: models/pose/heads/pose_decoder_64.pt  # decoder, notebook 31 (64 features, lr 0.003)
 
   # Frozen CLIP scene encoder; averages frame probabilities per bark segment.
   scene:
