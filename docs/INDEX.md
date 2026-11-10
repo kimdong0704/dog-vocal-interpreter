@@ -1,3 +1,1 @@
-- Reference papers: docs/reference/ (one .md note per paper; PDFs local only)
-  - CREMD (dog emotion annotation, 923 clips): docs/reference/cremd.md
 - Scene feature export and fusion handoff: [scene_fusion.md](scene_fusion.md)

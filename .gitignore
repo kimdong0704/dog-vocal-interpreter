@@ -242,6 +242,7 @@ models/*
 *.ckpt
 *.onnx
 *.safetensors
+
 # Body-branch weights ARE committed so BodyBranch works after a clone (agreed with Leo)
 !models/pose/
 models/pose/*
@@ -282,7 +283,8 @@ kaggle.json
 docs/reference/*.pdf
 
 # Preprocessing SED model
-third_party/
+third_party/*
+!third_party/.gitkeep
 
 # vs code settings
 .vscode/
