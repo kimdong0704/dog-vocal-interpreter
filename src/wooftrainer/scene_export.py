@@ -1,4 +1,4 @@
-"""Export scene features from a manifest of already-preprocessed RGB frames."""
+"""Export CLIP segment probabilities and embeddings from preprocessed RGB frames."""
 
 import argparse
 import json
@@ -114,8 +114,8 @@ def main(argv=None):
         if args.output.suffix.lower() != ".npz":
             raise ValueError("Scene cache output must use the .npz suffix")
         records = read_manifest(args.manifest)
-        from woofdecoder.scene import encoder_from_config
         from woofdecoder.config import load_config
+        from woofdecoder.scene import encoder_from_config
         from wooftrainer.scene_trainer.embeddings import cache_scene_segments
 
         encoder = encoder_from_config(load_config(args.config), device=args.device)
@@ -132,7 +132,10 @@ def main(argv=None):
         )
     except (OSError, ValueError, TypeError, RuntimeError, ModuleNotFoundError) as error:
         parser.exit(1, f"Scene export failed: {error}\n")
-    print(f"Saved {len(records)} scene vectors with {encoder.dim} features each to {output}")
+    print(
+        f"Saved {len(records)} CLIP segments: {len(CATEGORIES)} probabilities and "
+        f"{encoder.dim} embedding features each to {output}"
+    )
     return 0
 
 

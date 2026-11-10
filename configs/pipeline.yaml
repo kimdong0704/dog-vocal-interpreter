@@ -38,14 +38,13 @@ branches:
     pose: models/pose/yolo11m-pose_full/weights/best.pt  # encoder, notebook 30
     head: models/pose/decoder/pose_decoder_64.pt  # decoder, notebook 31 (64 features, lr 0.003)
 
-  # Frozen scene encoder for fusion (checked in notebook 41).
+  # Frozen CLIP scene encoder; averages frame probabilities per bark segment.
   scene:
-    encoder: yoloe_rfdetr_object_pool_v2
-    model: models/scene/yoloe-11s-seg-pf.pt
-    confidence: 0.6
-    image_size: 640
-    max_objects: 32
-    dog_overlap_iou: 0.5  # prefer RF-DETR's dog label for matching YOLOE boxes
+    encoder: clip_scene_v1
+    model: openai/clip-vit-base-patch32
+    revision: null  # optionally pin a Hugging Face commit
+    batch_size: 16
+    temperature: 1.0  # uncalibrated; average frame probabilities per segment
 
 # Fusion of branch outputs (decided in notebook 50).
 fusion:

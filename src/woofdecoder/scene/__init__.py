@@ -1,5 +1,6 @@
-"""Scene branch: frames -> frozen scene encoder features."""
+"""CLIP scene branch: sampled frames -> segment probabilities and features."""
 
-from woofdecoder.scene.encoder import ObjectFeaturePool, SceneEncoder, encoder_from_config
+from woofdecoder.scene.branch import SceneBranch
+from woofdecoder.scene.encoder import SceneEncoder, encoder_from_config
 
-__all__ = ["ObjectFeaturePool", "SceneEncoder", "encoder_from_config"]
+__all__ = ["SceneBranch", "SceneEncoder", "encoder_from_config"]

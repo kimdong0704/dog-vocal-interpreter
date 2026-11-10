@@ -1,310 +1,160 @@
-"""Frozen YOLOE objects and RF-DETR dogs for multimodal fusion."""
+"""Frozen CLIP: full RGB frames -> one five-category distribution per segment."""
 
 import hashlib
 import json
-from importlib.metadata import PackageNotFoundError, version
-from pathlib import Path
 
 import numpy as np
 import torch
 from PIL import Image
 
-from woofdecoder.config import REPO_ROOT
-from woofdecoder.preprocess.dog_detector import detect_dogs, load_dog_detector
-from woofdecoder.preprocess.segments import BarkSegment
+from woofdecoder.base_branch import Branch, BranchOutput
+from woofdecoder.taxonomy import CATEGORIES, NUM_CATEGORIES
 
-DEFAULT_CHECKPOINT = REPO_ROOT / "models/scene/yoloe-11s-seg-pf.pt"
-
-
-def box_iou(first, second):
-    x1 = max(first[0], second[0])
-    y1 = max(first[1], second[1])
-    x2 = min(first[2], second[2])
-    y2 = min(first[3], second[3])
-    intersection = max(x2 - x1, 0) * max(y2 - y1, 0)
-    first_area = max(first[2] - first[0], 0) * max(first[3] - first[1], 0)
-    second_area = max(second[2] - second[0], 0) * max(second[3] - second[1], 0)
-    union = first_area + second_area - intersection
-    return float(intersection / union) if union > 0 else 0.0
-
-
-def merge_dog_detections(
-    yoloe_objects, dogs, frame_index, frame_shape, dog_class_id, overlap_iou=0.5
-):
-    """Prefer RF-DETR's dog label when both detectors describe the same box."""
-    if not 0 < overlap_iou <= 1:
-        raise ValueError("overlap_iou must be between 0 and 1")
-    if not isinstance(frame_index, int) or frame_index < 0:
-        raise ValueError("frame_index must be a nonnegative integer")
-    if not isinstance(dog_class_id, int) or dog_class_id < 0:
-        raise ValueError("dog_class_id must be a nonnegative integer")
-    height, width = frame_shape[:2]
-    if height <= 0 or width <= 0:
-        raise ValueError("Frame dimensions must be positive")
-    dog_objects = []
-    for box, confidence in dogs:
-        values = np.asarray(box, dtype=float)
-        if values.shape != (4,) or not np.isfinite(values).all():
-            raise ValueError("Dog boxes must be finite pixel xywh coordinates")
-        if not np.isfinite(confidence) or not 0 < confidence <= 1:
-            raise ValueError("Dog confidence must be between 0 and 1")
-        x, y, box_width, box_height = values
-        x1, x2 = np.clip([x, x + box_width], 0, width) / width
-        y1, y2 = np.clip([y, y + box_height], 0, height) / height
-        if x2 <= x1 or y2 <= y1:
-            continue
-        dog_objects.append(
-            {
-                "frame": frame_index,
-                "class_id": dog_class_id,
-                "name": "dog",
-                "confidence": float(confidence),
-                "box": [float(x1), float(y1), float(x2), float(y2)],
-                "source": "rfdetr",
-            }
-        )
-    kept, suppressed = [], []
-    for obj in yoloe_objects:
-        overlap = max((box_iou(obj["box"], dog["box"]) for dog in dog_objects), default=0.0)
-        if obj["frame"] == frame_index and overlap >= overlap_iou:
-            suppressed.append({**obj, "matched_dog_iou": overlap})
-        else:
-            kept.append(obj)
-    return kept + dog_objects, suppressed
-
-
-class ObjectFeaturePool:
-    feature_names = (
-        "frame_fraction",
-        "mean_count",
-        "max_confidence",
-        "mean_center_x",
-        "mean_center_y",
-        "mean_width",
-        "mean_height",
-        "mean_area",
-        "delta_center_x",
-        "delta_center_y",
+DEFAULT_MODEL = "openai/clip-vit-base-patch32"
+# Exploratory descriptions in taxonomy order; not validated behavioral labels.
+DEFAULT_PROMPTS = dict(
+    zip(
+        CATEGORIES,
+        (
+            "Context where a dog is showing alert or aggressive behavior.",
+            "Context where a dog is showing playful or excited behavior.",
+            "Context where a dog is showing distress or loneliness.",
+            "Context where a dog is seeking attention from a person.",
+            "Context where a dog is in another everyday situation.",
+        ),
+        strict=True,
     )
-
-    def __init__(self, names):
-        self.names = tuple(names)
-        if not self.names or len(set(self.names)) != len(self.names):
-            raise ValueError("Use a nonempty, unique detector vocabulary")
-        self.dim = len(self.names) * len(self.feature_names)
-
-    def encode(self, detections, frame_count):
-        if not isinstance(frame_count, int) or frame_count < 0:
-            raise ValueError("frame_count must be a nonnegative integer")
-        counts = np.zeros((frame_count, len(self.names)), dtype=np.float32)
-        scores = np.zeros_like(counts)
-        weight_sums = np.zeros_like(counts)
-        geometry = np.zeros((frame_count, len(self.names), 5), dtype=np.float32)
-
-        for obj in detections:
-            frame, class_id = obj["frame"], obj["class_id"]
-            if not isinstance(frame, int) or not 0 <= frame < frame_count:
-                raise ValueError("Detection frame is outside this segment")
-            if not isinstance(class_id, int) or not 0 <= class_id < len(self.names):
-                raise ValueError("Detection class ID is outside the saved vocabulary")
-            if obj["name"] != self.names[class_id]:
-                raise ValueError("Detection name and class ID disagree with the vocabulary")
-            x1, y1, x2, y2 = obj["box"]
-            confidence = obj["confidence"]
-            values = np.array([x1, y1, x2, y2, confidence])
-            if not np.isfinite(values).all() or not ((values >= 0) & (values <= 1)).all():
-                raise ValueError("Boxes and confidence must be normalized between 0 and 1")
-            if x2 <= x1 or y2 <= y1 or confidence <= 0:
-                raise ValueError("Detections need positive box area and confidence")
-
-            width, height = x2 - x1, y2 - y1
-            box_features = np.array(
-                [
-                    (x1 + x2) / 2,
-                    (y1 + y2) / 2,
-                    width,
-                    height,
-                    width * height,
-                ]
-            )
-            counts[frame, class_id] += 1
-            scores[frame, class_id] = max(scores[frame, class_id], confidence)
-            geometry[frame, class_id] += confidence * box_features
-            weight_sums[frame, class_id] += confidence
-
-        pooled = np.zeros((len(self.names), len(self.feature_names)), dtype=np.float32)
-        if frame_count == 0:
-            return pooled.reshape(-1)
-
-        geometry /= np.maximum(weight_sums[:, :, None], np.finfo(np.float32).tiny)
-        pooled[:, 0] = (counts > 0).mean(axis=0)
-        pooled[:, 1] = counts.mean(axis=0)
-        pooled[:, 2] = scores.max(axis=0)
-        for class_id in np.flatnonzero(counts.sum(axis=0)):
-            observed = np.flatnonzero(counts[:, class_id])
-            positions = geometry[observed, class_id]
-            pooled[class_id, 3:8] = positions.mean(axis=0)
-            pooled[class_id, 8:10] = positions[-1, :2] - positions[0, :2]
-        return pooled.reshape(-1)
+)
 
 
-class SceneEncoder:
-    name = "yoloe_rfdetr_object_pool_v2"
+def average_frame_probs(frame_probs):
+    """Average distributions, retaining uncertainty rather than voting on winners."""
+    values = np.asarray(frame_probs, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] != NUM_CATEGORIES:
+        raise ValueError("Expected frame probabilities with shape (frames, 5)")
+    if not np.isfinite(values).all() or (values < 0).any():
+        raise ValueError("Frame probabilities must be finite and nonnegative")
+    if not np.allclose(values.sum(axis=1), 1, atol=1e-5):
+        raise ValueError("Each frame distribution must sum to one")
+    if len(values) == 0:
+        return np.full(NUM_CATEGORIES, 1 / NUM_CATEGORIES, dtype=np.float32)
+    return values.mean(axis=0)
+
+
+class SceneEncoder(Branch):
+    """predict(segment) follows audio/body's BranchOutput contract."""
+
+    name = "clip_scene_v1"
 
     def __init__(
         self,
-        checkpoint=DEFAULT_CHECKPOINT,
+        model=DEFAULT_MODEL,
         device=None,
-        confidence=0.25,
-        image_size=640,
-        max_objects=32,
-        dog_detector=None,
-        dog_overlap_iou=0.5,
+        batch_size=16,
+        temperature=1.0,
+        revision=None,
+        prompts=None,
     ):
-        from ultralytics import YOLOE
+        if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
+            raise ValueError("batch_size must be a positive integer")
+        if not np.isfinite(temperature) or temperature <= 0:
+            raise ValueError("temperature must be finite and positive")
+        prompts = dict(DEFAULT_PROMPTS if prompts is None else prompts)
+        if set(prompts) != set(CATEGORIES) or any(
+            not isinstance(p, str) or not p.strip() for p in prompts.values()
+        ):
+            raise ValueError("Supply one nonempty prompt for every taxonomy category")
+        from transformers import CLIPModel, CLIPProcessor
 
-        checkpoint = Path(checkpoint)
-        if not checkpoint.is_absolute():
-            checkpoint = REPO_ROOT / checkpoint
-        if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        if not checkpoint.name.endswith("-seg-pf.pt"):
-            raise ValueError("Use a prompt-free YOLOE checkpoint ending in -seg-pf.pt")
-        if not 0 < confidence <= 1 or image_size < 1 or max_objects < 1:
-            raise ValueError("Confidence, image size, and detection limit must be positive")
-        if not 0 < dog_overlap_iou <= 1:
-            raise ValueError("dog_overlap_iou must be between 0 and 1")
-        self.device = device
-        self.confidence = confidence
-        self.image_size = image_size
-        self.max_objects = max_objects
-        self.model = YOLOE(str(checkpoint))
-        self.model.model.eval()
-        for parameter in self.model.model.parameters():
-            parameter.requires_grad_(False)
-        names = self.model.names
-        self.pool = ObjectFeaturePool([names[i] for i in range(len(names))])
-        self.names = self.pool.names
-        self.dim = self.pool.dim
-        if "dog" not in self.names:
-            raise ValueError("The YOLOE vocabulary must include the canonical dog class")
-        self.dog_class_id = self.names.index("dog")
-        self.dog_detector = (
-            dog_detector
-            if dog_detector is not None
-            else load_dog_detector(verbose=False, device=device)
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.batch_size = batch_size
+        self.temperature = float(temperature)
+        self.prompts = [prompts[category] for category in CATEGORIES]
+        self.model = CLIPModel.from_pretrained(model, revision=revision).to(self.device).eval()
+        self.model.requires_grad_(False)
+        self.processor = CLIPProcessor.from_pretrained(model, revision=revision)
+        self.dim = self.model.config.projection_dim
+        self.text_inputs = self.processor(text=self.prompts, return_tensors="pt", padding=True).to(
+            self.device
         )
-        self.dog_overlap_iou = dog_overlap_iou
-        try:
-            dog_version = version("rfdetr")
-        except PackageNotFoundError:
-            dog_version = None
-        dog_schema = {
-            "model": type(self.dog_detector.model).__name__,
-            "package_version": dog_version,
-            "confidence": self.dog_detector.score_threshold,
-            "overlap_iou": dog_overlap_iou,
-            "merge_policy": "prefer_dog_for_high_iou_boxes_v1",
-        }
-        dog_config = getattr(self.dog_detector.model, "model_config", None)
-        dog_checkpoint = getattr(dog_config, "pretrain_weights", None)
-        if dog_checkpoint and Path(dog_checkpoint).is_file():
-            dog_path = Path(dog_checkpoint)
-            dog_schema["checkpoint"] = dog_path.name
-            dog_schema["checkpoint_sha256"] = hashlib.sha256(dog_path.read_bytes()).hexdigest()
         self.schema = {
             "encoder": self.name,
-            "checkpoint": checkpoint.name,
-            "checkpoint_sha256": hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
-            "vocabulary": list(self.names),
-            "feature_names": list(self.pool.feature_names),
-            "layout": "class_major",
-            "confidence": confidence,
-            "image_size": image_size,
-            "max_yoloe_objects_per_frame": max_objects,
-            "dog_detector": dog_schema,
+            "model": model,
+            "revision": getattr(self.model.config, "_commit_hash", None) or revision,
+            "embedding_dim": self.dim,
+            "categories": list(CATEGORIES),
+            "prompts": self.prompts,
+            "temperature": self.temperature,
+            "aggregation": "mean_frame_probabilities",
+            "embedding_pooling": "normalized_mean_of_normalized_frame_embeddings",
+            "image_processor": self.processor.image_processor.to_dict(),
         }
-        schema_text = json.dumps(self.schema, sort_keys=True)
-        self.schema_id = hashlib.sha256(schema_text.encode()).hexdigest()
+        self.schema_id = hashlib.sha256(
+            json.dumps(self.schema, sort_keys=True).encode()
+        ).hexdigest()
 
     @torch.inference_mode()
     def encode_frames(self, frames, frame_times_s=None):
         frames = list(frames)
         if frame_times_s is not None:
             times = np.asarray(frame_times_s, dtype=float)
-            if times.shape != (len(frames),) or not np.isfinite(times).all():
-                raise ValueError("Supply one finite timestamp per frame")
-            if (np.diff(times) < 0).any():
-                raise ValueError("Frame timestamps must be in chronological order")
-        detections, yoloe_detections, dog_detections, suppressed = [], [], [], []
-        self.model.model.eval()
-        for frame_index, frame in enumerate(frames):
-            image = np.asarray(frame)
-            if image.ndim != 3 or image.shape[-1] != 3 or image.dtype != np.uint8:
-                raise ValueError("Frames must be uint8 RGB images")
-            result = self.model.predict(
-                source=Image.fromarray(image),
-                device=self.device,
-                conf=self.confidence,
-                imgsz=self.image_size,
-                max_det=self.max_objects,
-                verbose=False,
-            )[0]
-            names = tuple(result.names[i] for i in range(len(result.names)))
-            if names != self.names:
-                raise ValueError("Detector vocabulary changed")
-            frame_objects = []
-            for box in result.boxes:
-                class_id = int(box.cls.item())
-                detection = {
-                    "frame": frame_index,
-                    "class_id": class_id,
-                    "name": self.names[class_id],
-                    "confidence": float(box.conf.item()),
-                    "box": box.xyxyn[0].cpu().tolist(),
-                    "source": "yoloe",
-                }
-                frame_objects.append(detection)
-            # Run one frame at a time; keep every dog returned by preprocessing's detector.
-            dogs = detect_dogs(self.dog_detector, [image.copy()])[0]
-            combined, replaced = merge_dog_detections(
-                frame_objects,
-                dogs,
-                frame_index,
-                image.shape,
-                self.dog_class_id,
-                self.dog_overlap_iou,
+            if (
+                times.shape != (len(frames),)
+                or not np.isfinite(times).all()
+                or (np.diff(times) < 0).any()
+            ):
+                raise ValueError("Supply one chronological, finite timestamp per frame")
+        images = []
+        for frame in frames:
+            frame = np.asarray(frame)
+            if (
+                frame.ndim != 3
+                or frame.shape[-1] != 3
+                or frame.dtype != np.uint8
+                or min(frame.shape[:2]) == 0
+            ):
+                raise ValueError("Frames must be nonempty uint8 RGB images")
+            images.append(Image.fromarray(frame))
+        probabilities, embeddings = [], []
+        self.model.eval()
+        for start in range(0, len(images), self.batch_size):
+            inputs = self.processor(
+                images=images[start : start + self.batch_size], return_tensors="pt"
+            ).to(self.device)
+            output = self.model(**inputs, **self.text_inputs)
+            probabilities.append(
+                (output.logits_per_image / self.temperature).softmax(dim=-1).cpu().numpy()
             )
-            if frame_times_s is not None:
-                for detection in frame_objects + combined + replaced:
-                    detection["time_s"] = float(times[frame_index])
-            detections.extend(combined)
-            yoloe_detections.extend(frame_objects)
-            dog_detections.extend(obj for obj in combined if obj["source"] == "rfdetr")
-            suppressed.extend(replaced)
+            embeddings.append(output.image_embeds.cpu().numpy())
+        frame_probs = (
+            np.concatenate(probabilities).astype(np.float32)
+            if probabilities
+            else np.empty((0, NUM_CATEGORIES), dtype=np.float32)
+        )
+        embedding = np.zeros(self.dim, dtype=np.float32)
+        if embeddings:
+            vectors = np.concatenate(embeddings).astype(np.float32)
+            vectors /= np.maximum(np.linalg.norm(vectors, axis=1, keepdims=True), 1e-12)
+            embedding = vectors.mean(axis=0)
+            embedding /= max(float(np.linalg.norm(embedding)), 1e-12)
         return {
-            "embedding": self.pool.encode(detections, len(frames)),
-            "detected_objects": detections,
-            "yoloe_objects": yoloe_detections,
-            "dog_objects": dog_detections,
-            "suppressed_objects": suppressed,
-            "present": len(frames) > 0,
-            "has_detections": bool(detections),
+            "embedding": embedding,
+            "probs": average_frame_probs(frame_probs),
+            "frame_probs": frame_probs,
+            "present": bool(frames),
             "frame_count": len(frames),
             "schema_id": self.schema_id,
         }
 
-    def embed_frames(self, frames):
-        return self.encode_frames(frames)["embedding"]
-
-    def encode_segment(self, segment: BarkSegment):
-        """Return scene features and the source interval used by preprocessing."""
+    def encode_segment(self, segment):
         times = np.asarray(segment.frame_times_s, dtype=float)
-        if not np.isfinite([segment.start_s, segment.end_s]).all():
-            raise ValueError("Segment boundaries must be finite")
-        if times.size and (
-            (times < segment.start_s - 1e-3).any() or (times > segment.end_s + 1e-3).any()
+        if (
+            not np.isfinite([segment.start_s, segment.end_s]).all()
+            or segment.start_s < 0
+            or segment.end_s < segment.start_s
         ):
+            raise ValueError("Invalid segment boundaries")
+        if (times < segment.start_s - 1e-3).any() or (times > segment.end_s + 1e-3).any():
             raise ValueError("Frame timestamps must fall inside the segment")
         result = self.encode_frames(segment.frames, segment.frame_times_s)
         result.update(
@@ -315,38 +165,45 @@ class SceneEncoder:
         )
         return result
 
+    def predict(self, segment):
+        result = self.encode_segment(segment)
+        return BranchOutput(
+            probs=result["probs"],
+            present=result["present"],
+            extras={
+                "frame_probs": result["frame_probs"].tolist(),
+                "frame_times_s": result["frame_times_s"],
+                "frame_count": result["frame_count"],
+                "aggregation": "mean_frame_probabilities",
+                "calibrated": False,
+            },
+        )
+
+    def embed(self, segment):
+        return self.encode_segment(segment)["embedding"] if segment.has_video else None
+
+    def embed_frames(self, frames):
+        return self.encode_frames(frames)["embedding"]
+
     def encode_segments(self, segments):
         return [self.encode_segment(segment) for segment in segments]
 
-    def embed(self, segment: BarkSegment) -> np.ndarray | None:
-        if not segment.has_video:
-            return None
-        return self.encode_segment(segment)["embedding"]
+    @classmethod
+    def from_config(cls, config=None, device=None):
+        from woofdecoder.config import load_config
+
+        return encoder_from_config(load_config() if config is None else config, device)
 
 
-def encoder_from_config(config: dict, device: str | None = None, dog_detector=None) -> SceneEncoder:
-    """Load the scene encoder using branches.scene settings."""
+def encoder_from_config(config, device=None):
     section = config["branches"]["scene"]
     if section.get("encoder") != SceneEncoder.name:
         raise ValueError(f"Unsupported scene encoder: {section.get('encoder')!r}")
-    if not section.get("model"):
-        raise ValueError("Set branches.scene.model in configs/pipeline.yaml")
-    if device is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-    if dog_detector is None:
-        dog_section = config["dog_detector"]
-        dog_detector = load_dog_detector(
-            model_size=dog_section["model"],
-            score_threshold=float(dog_section["score_threshold"]),
-            verbose=False,
-            device=device,
-        )
     return SceneEncoder(
-        checkpoint=section["model"],
+        model=section["model"],
         device=device,
-        confidence=float(section.get("confidence", 0.25)),
-        image_size=int(section.get("image_size", 640)),
-        max_objects=int(section.get("max_objects", 32)),
-        dog_detector=dog_detector,
-        dog_overlap_iou=float(section.get("dog_overlap_iou", 0.5)),
+        batch_size=section.get("batch_size", 16),
+        temperature=section.get("temperature", 1.0),
+        revision=section.get("revision"),
+        prompts=section.get("prompts"),
     )
