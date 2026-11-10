@@ -62,52 +62,6 @@ def balanced_weights(labels: np.ndarray, sample_weight: np.ndarray) -> np.ndarra
     return weights
 
 def source_balanced_weights(
-
-    labels: np.ndarray, sources: np.ndarray, sample_weight: np.ndarray
-
-) -> np.ndarray:
-
-    """Like balanced_weights, but inside each class every source also gets an equal share.
- 
-    Every class still totals the same. Within a class with sources Act_Env and self_labeled,
-
-    each gets half of it, so "which source is this" cannot predict the class. Without this,
-
-    a class whose only examples come from one source (e.g. distressed_lonely, all YouTube)
-
-    teaches the head to recognise the source.
-
-    """
-
-    labels = np.asarray(labels)
-
-    sources = np.asarray(sources)
-
-    sample_weight = np.asarray(sample_weight, dtype=float)
-
-    classes = np.unique(labels)
-
-    total = sample_weight.sum()
-
-    weights = sample_weight.copy()
-
-    for class_name in classes:
-
-        in_class = labels == class_name
-
-        class_sources = np.unique(sources[in_class])
-
-        for source in class_sources:
-
-            in_group = in_class & (sources == source)
-
-            share = total / (len(classes) * len(class_sources))
-
-            weights[in_group] *= share / sample_weight[in_group].sum()
-
-    return weights
-
-def source_balanced_weights(
     labels: np.ndarray, sources: np.ndarray, sample_weight: np.ndarray
 ) -> np.ndarray:
     # sources Act_Env and self_labeled each gets half
