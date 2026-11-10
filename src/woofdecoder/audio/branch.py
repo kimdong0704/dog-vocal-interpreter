@@ -20,9 +20,9 @@ from typing import Any
  
 import numpy as np
  
-from woofdecoder.branches.audio.encoder import AudioEncoder, encoder_from_config
-from woofdecoder.branches.audio.features import Layer, check_layer, select_layer
-from woofdecoder.branches.audio.head import (
+from woofdecoder.audio.encoder import AudioEncoder, encoder_from_config
+from woofdecoder.audio.features import Layer, check_layer, select_layer
+from woofdecoder.audio.head import (
     AROUSAL_HEAD_FILENAME,
     NUDGE_FILENAME,
     SITUATION_HEAD_FILENAME,
@@ -32,7 +32,7 @@ from woofdecoder.branches.audio.head import (
     emotion_input_names,
     emotion_inputs,
 )
-from woofdecoder.branches.base import Branch, BranchOutput
+from woofdecoder.base_branch import Branch, BranchOutput
 from woofdecoder.config import REPO_ROOT, load_config
 from woofdecoder.preprocess.segments import BarkSegment
 from woofdecoder.taxonomy import CATEGORIES, CATEGORY_INDEX, NUM_CATEGORIES

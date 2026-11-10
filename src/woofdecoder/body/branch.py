@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from woofdecoder.branches.base import Branch, BranchOutput
+from woofdecoder.base_branch import Branch, BranchOutput
 from woofdecoder.config import REPO_ROOT, load_config
 from woofdecoder.preprocess.segments import BarkSegment
 from woofdecoder.taxonomy import CATEGORIES

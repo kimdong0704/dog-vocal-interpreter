@@ -8,7 +8,7 @@ other YOLOE objects stay. Both models run one frame at a time.
 ## Runtime interface
 
 ```python
-from woofdecoder.branches.scene import encoder_from_config
+from woofdecoder.scene import encoder_from_config
 from woofdecoder.config import load_config
 
 encoder = encoder_from_config(load_config())
@@ -75,7 +75,7 @@ videos, find barks, extract frames, create labels, or assign train/test splits.
 Fusion training can read a cache without loading either detector or their weights:
 
 ```python
-from wooftrainer.trainers.scene_embeddings import load_scene_cache
+from wooftrainer.scene_trainer.embeddings import load_scene_cache
 
 scene_x, scene_rows = load_scene_cache("cache/scene.npz")
 schema_id = scene_rows.attrs["scene_schema_id"]

@@ -75,7 +75,7 @@ only as far as needed.
 
 ## Scene encoder
 
-The frozen scene encoder lives in `src/woofdecoder/branches/scene.py`.
+The frozen scene encoder lives in `src/woofdecoder/scene/encoder.py`.
 Load it with `encoder_from_config(load_config())`, then call `encoder.embed(segment)`
 to get features for fusion. Its detector settings are in `configs/pipeline.yaml`.
 The scene features describe detected objects; fusion supplies the behavioral prediction.
@@ -84,7 +84,7 @@ with canonical dog boxes. Other YOLOE objects are retained. Dog-detector setting
 from `dog_detector`; `branches.scene.dog_overlap_iou` controls matching. Both models run
 in inference mode. Rebuild older scene caches after this change.
 Use [notebook 41](notebooks/41_scene_training.ipynb) for image examples and checks.
-Cache helpers live in `src/wooftrainer/trainers/scene_embeddings.py`.
+Cache helpers live in `src/wooftrainer/scene_trainer/embeddings.py`.
 
 Export already-preprocessed frames without a notebook:
 

@@ -8,7 +8,7 @@ import pandas as pd
 
 from woofdata.path import data_path, load_data_dir_from_env_file
 from woofdata.tasks import AudioContextSample, AudioEmotionSample, task_rows
-from woofdecoder.branches.audio import AudioEncoder
+from woofdecoder.audio import AudioEncoder
 from wooftrainer.torch_datasets import TaskDataset
 
 CACHE_DIR: str = "cache/audio_embeddings"
@@ -93,7 +93,7 @@ def cache_embeddings(
  
     new_since_save = 0
     for index in range(len(dataset)):
-        clip_id = dataset.rows.at[index, "clip_id"]
+        clip_id = str(dataset.rows.at[index, "clip_id"])
         if clip_id in done:
             continue
         sample = dataset[index]

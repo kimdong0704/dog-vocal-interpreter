@@ -1,6 +1,6 @@
 """Audio branch: bark segment -> embedding -> category probabilities."""
  
-from woofdecoder.branches.audio.encoder import (
+from woofdecoder.audio.encoder import (
     SAMPLE_RATE,
     AudioEncoder,
     EncoderSettings,
@@ -9,7 +9,7 @@ from woofdecoder.branches.audio.encoder import (
     load_audio_encoder,
     split_into_chunks,
 )
-from woofdecoder.branches.audio.head import (
+from woofdecoder.audio.head import (
     AROUSAL_HEAD_FILENAME,
     NUDGE_FILENAME,
     SITUATION_HEAD_FILENAME,
@@ -20,8 +20,8 @@ from woofdecoder.branches.audio.head import (
     emotion_inputs,
     softmax
 )
-from woofdecoder.branches.audio.features import LAYER_MEAN, Layer, check_layer, select_layer
-from woofdecoder.branches.audio.branch import AudioBranch, load_heads, to_categories_order
+from woofdecoder.audio.features import LAYER_MEAN, Layer, check_layer, select_layer
+from woofdecoder.audio.branch import AudioBranch, load_heads, to_categories_order
 
 
 __all__ = [

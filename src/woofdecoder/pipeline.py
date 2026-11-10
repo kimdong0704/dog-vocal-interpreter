@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from woofdecoder.branches.audio import AudioBranch
-from woofdecoder.branches.base import BranchOutput
+from woofdecoder.audio import AudioBranch
+from woofdecoder.base_branch import BranchOutput
 from woofdecoder.config import load_config
 from woofdecoder.preprocess.bark_detector import load_bark_detector, settings_from_config
 from woofdecoder.preprocess.bark_segments import build_segments
@@ -45,8 +45,12 @@ class Pipeline:
     def __init__(self, config: dict | None = None, device: str | None = None) -> None:
         if config is None:
             config = load_config()
+
+        # Preprocess
         self.settings = settings_from_config(config)
         self.detector = load_bark_detector(config["bark_detector"]["model"], device, verbose=False)
+
+        # Audio
         self.audio = AudioBranch.from_config(config, device)
 
     def run(self, path: str | Path, verbose: bool = False) -> list[SegmentResult]:

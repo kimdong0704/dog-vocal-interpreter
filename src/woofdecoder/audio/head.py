@@ -5,7 +5,7 @@ from pathlib import Path
  
 import numpy as np
  
-from woofdecoder.branches.audio.features import LAYER_MEAN, Layer, check_layer
+from woofdecoder.audio.features import LAYER_MEAN, Layer, check_layer
  
 FORMAT_VERSION: int = 1
 

@@ -114,9 +114,9 @@ def main(argv=None):
         if args.output.suffix.lower() != ".npz":
             raise ValueError("Scene cache output must use the .npz suffix")
         records = read_manifest(args.manifest)
-        from woofdecoder.branches.scene import encoder_from_config
+        from woofdecoder.scene import encoder_from_config
         from woofdecoder.config import load_config
-        from wooftrainer.trainers.scene_embeddings import cache_scene_segments
+        from wooftrainer.scene_trainer.embeddings import cache_scene_segments
 
         encoder = encoder_from_config(load_config(args.config), device=args.device)
         metadata = [

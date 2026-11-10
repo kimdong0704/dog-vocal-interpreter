@@ -6,14 +6,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from scipy.optimize import minimize_scalar, minimize
+from scipy.optimize import OptimizeResult, minimize_scalar, minimize
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score, log_loss
 from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
-from woofdecoder.branches.audio.features import LAYER_MEAN, Layer, select_layer
-from woofdecoder.branches.audio.head import (
+from woofdecoder.audio.features import LAYER_MEAN, Layer, select_layer
+from woofdecoder.audio.head import (
     AROUSAL_HEAD_FILENAME,
     NUDGE_FILENAME,
     SITUATION_HEAD_FILENAME,
@@ -25,7 +25,7 @@ from woofdecoder.branches.audio.head import (
     softmax,
 )
 
-from wooftrainer.trainers.embeddings import attach_labels, load_embeddings
+from wooftrainer.audio_trainer.embeddings import attach_labels, load_embeddings
 
 DEFAULT_C_VALUES: tuple[float, ...] = (0.00003, 0.0001, 0.0003, 0.001, 0.003, 0.01, 0.1, 1.0)
 NUM_FOLDS: int = 5
@@ -101,8 +101,9 @@ def fit_linear_head(
     coefficients = model.coef_
     intercepts = model.intercept_
     if len(model.classes_) == 2:
-        coefficients = np.vstack([-coefficients[0]/2], coefficients[0]/2)
-        intercepts = np.array([-intercepts[0]/2], intercepts[0]/2)
+        coefficients = np.vstack([-coefficients[0]/2, coefficients[0]/2])
+        intercepts = np.array([-intercepts[0]/2, intercepts[0]/2])
+    assert scaler.mean_ is not None and scaler.scale_ is not None  # set by fit (with_mean/with_std on)
     return LinearHead(
         classes=model.classes_.tolist(),
         weights=coefficients,
@@ -176,7 +177,7 @@ def choose_C(
         result["C"] = C
         results.append(result)
     table = pd.DataFrame(results)
-    best_C = float(table.loc[table["log_loss"].idxmin(), "C"])
+    best_C = float(table["C"].to_numpy()[table["log_loss"].to_numpy().argmin()])
     return best_C, table
 
 def fit_temperature(
@@ -191,6 +192,7 @@ def fit_temperature(
         return float(log_loss(labels, probs, labels=classes, sample_weight=weights))
     
     result = minimize_scalar(loss_at, bounds=TEMPERATURE_BOUNDS, method="bounded")
+    assert isinstance(result, OptimizeResult)
     temperature = float(result.x)
     low, high = TEMPERATURE_BOUNDS
     if temperature < low * 1.01 or temperature > high * 0.99:
@@ -281,8 +283,7 @@ def choose_nudge_l2(
     results: list[dict] = []
     
     no_nudge = score_probs(labels, softmax(logits), classes, weights)
-    no_nudge["l2"] = NO_NUDGE
-    results.append(no_nudge)
+    results.append({**no_nudge, "l2": NO_NUDGE})
     
     for l2 in l2_values:
         nudged = out_of_fold_nudged_logits(logits, inputs, labels, classes, weights, folds, l2)
@@ -292,7 +293,7 @@ def choose_nudge_l2(
     
     table = pd.DataFrame(results)
     nudged = table.loc[table["l2"] != NO_NUDGE]
-    best = nudged.loc[nudged["log_loss"].idxmin()]
+    best = nudged.iloc[nudged["log_loss"].to_numpy().argmin()]
     gain = no_nudge["log_loss"] - best["log_loss"]
     if gain < MIN_NUDGE_GAIN or best["macro_f1"] < no_nudge["macro_f1"]:
         return None, table
