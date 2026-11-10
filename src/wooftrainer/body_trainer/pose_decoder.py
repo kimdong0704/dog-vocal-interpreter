@@ -81,6 +81,8 @@ def train_pose_decoder(
     verbose: bool = True,
 ) -> TrainHistory:
     """Adam + class-weighted cross-entropy; saves the state_dict with the best val macro-F1."""
+    if len(splits.y_train) == 0 or len(splits.y_val) == 0:
+        raise ValueError("train and val splits must both be non-empty")
     device = device or pick_device()
     torch.manual_seed(seed)
     model = PoseClassifier(n_features=splits.X_train.shape[1]).to(device)
@@ -115,7 +117,8 @@ def train_pose_decoder(
                 val_total += criterion(outputs, labels.to(device)).item() * len(labels)
                 val_preds.append(outputs.argmax(dim=1).cpu())
         history.val_loss.append(val_total / len(splits.y_val))
-        val_f1 = float(f1_score(splits.y_val, torch.cat(val_preds).numpy(), average="macro"))
+        # Same metric as evaluation: macro over all classes, absent classes score 0.
+        val_f1 = score_predictions(splits.y_val, torch.cat(val_preds).numpy())["macro_f1"]
         history.val_macro_f1.append(val_f1)
 
         is_best = val_f1 > history.best_f1
@@ -152,9 +155,11 @@ def sweep_learning_rates(
 
 
 def load_pose_decoder(checkpoint_path: str | Path, device: torch.device | None = None) -> PoseClassifier:
+    """Input size is read from the checkpoint, so it matches whatever the model was trained on."""
     device = device or pick_device()
-    model = PoseClassifier().to(device)
-    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+    state_dict = torch.load(checkpoint_path, map_location=device)
+    model = PoseClassifier(n_features=state_dict["fc1.weight"].shape[1]).to(device)
+    model.load_state_dict(state_dict)
     model.eval()
     return model
 

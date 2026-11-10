@@ -5,11 +5,13 @@ Steps:
    (Kaggle Dog Emotion, Roboflow Dog Emotion Videos, self-labelled attention_seeking).
 2. add_pose_columns / load_or_build_pose_table: run the pose encoder (YOLO11m-pose) and keep
    only images with exactly 1 dog. The result is cached as pose.pkl.
-3. features_and_labels: 64 features per kept image (woofdecoder.body.make_features) and
+3. features_and_labels: 64 features per kept image (woofdecoder.body.branch.make_features) and
    integer labels in DECODER_CLASSES order.
 4. split_by_group: 70 / 15 / 15 split where a video (group) never lands in two splits.
 
-Column names match the notebook's pose.pkl, so an existing cache loads unchanged.
+Column names match the notebook's pose.pkl, so an existing cache loads unchanged. Image paths
+are stored with forward slashes on every OS; older caches written on Windows are normalised
+on load.
 """
 
 from __future__ import annotations
@@ -33,6 +35,7 @@ from woofdecoder.config import REPO_ROOT
 
 PATH_COLUMN = "path to image"  # relative to raw_root()
 TABLE_COLUMNS: list[str] = [PATH_COLUMN, "source", "original_label", "category", "group"]
+POSE_COLUMNS: list[str] = ["n_dogs", "kept", "drop_reason", "box", "keypoints"]
 
 KAGGLE_DIR = Path("dog_emotion_kaggle") / "Dog Emotion"
 KAGGLE_MAP: dict[str, str] = {
@@ -69,6 +72,11 @@ def default_pose_cache() -> Path:
     return raw_root() / "interim" / "pose.pkl"
 
 
+def posix_path(path: str | Path) -> str:
+    """Cache key for an image path: forward slashes on every OS (Windows caches used '\\')."""
+    return str(path).replace("\\", "/")
+
+
 # --- 1. Label table ---
 
 
@@ -80,7 +88,7 @@ def kaggle_rows(root: Path) -> list[list[str]]:
             continue
         for file in sorted(folder.iterdir()):
             rows.append(
-                [str(file.relative_to(root)), "kaggle", folder.name, category, f"kaggle_{file.name}"]
+                [file.relative_to(root).as_posix(), "kaggle", folder.name, category, f"kaggle_{file.name}"]
             )
     return rows
 
@@ -104,7 +112,7 @@ def roboflow_rows(root: Path) -> list[list[str]]:
                 continue
             path = split_dir / image["file_name"]
             rows.append([
-                str(path.relative_to(root)),
+                path.relative_to(root).as_posix(),
                 "roboflow",
                 label,
                 ROBOFLOW_MAP[label],
@@ -114,7 +122,11 @@ def roboflow_rows(root: Path) -> list[list[str]]:
 
 
 def self_labeled_rows(root: Path) -> list[list[str]]:
-    """labels.csv has columns filename, label, group."""
+    """labels.csv has columns filename, label, group.
+
+    Groups get a 'self_labeled_' prefix (like 'kaggle_' / 'roboflow_') so they never collide
+    with another source's group in split_by_group.
+    """
     labels_path = root / SELF_LABELED_DIR / "labels.csv"
     if not labels_path.is_file():
         return []
@@ -122,7 +134,9 @@ def self_labeled_rows(root: Path) -> list[list[str]]:
     rows = []
     for record in table.itertuples(index=False):
         path = (SELF_LABELED_DIR / str(record.filename)).as_posix()
-        rows.append([path, "self_labeled", record.label, record.label, str(record.group)])
+        rows.append(
+            [path, "self_labeled", record.label, record.label, f"self_labeled_{record.group}"]
+        )
     return rows
 
 
@@ -171,7 +185,7 @@ def run_pose_encoder(
             parsed = parse_result(result)
             parsed["drop_reason"] = drop_reason(parsed["n_dogs"])
             rows.append(parsed)
-    return pd.DataFrame(rows, columns=["n_dogs", "kept", "drop_reason", "box", "keypoints"])
+    return pd.DataFrame(rows, columns=POSE_COLUMNS)
 
 
 def add_pose_columns(
@@ -190,31 +204,38 @@ def load_or_build_pose_table(
     device: str | None = None,
     include_self_labeled: bool = True,
 ) -> pd.DataFrame:
-    """Load pose.pkl, encoding only the label-table images it does not have yet.
+    """Current label table joined with pose results from pose.pkl.
 
-    New images (e.g. newly self-labelled ones) are encoded and appended, and the cache is
-    rewritten. The encoder is loaded only when something needs encoding.
+    Only label-table images missing from the cache are encoded; they are appended and the
+    cache is rewritten. The encoder is loaded only when something needs encoding.
+
+    The returned rows are exactly the current label table (same order, current source /
+    category / group), so images removed or relabelled since the cache was built, and
+    self-labelled images when include_self_labeled=False, never leak in from the cache.
+    The cache itself keeps every image it has encoded, so toggling sources needs no re-encode.
     """
     root = root or raw_root()
     cache_path = cache_path or default_pose_cache()
     labels = build_label_table(root, include_self_labeled=include_self_labeled)
 
-    cached = pd.DataFrame()
+    cached = pd.DataFrame(columns=[PATH_COLUMN, *POSE_COLUMNS])
     if cache_path.is_file():
         cached = pd.read_pickle(cache_path)
         cached = cached.loc[:, ~cached.columns.duplicated()]  # old caches had duplicate columns
+        cached[PATH_COLUMN] = cached[PATH_COLUMN].map(posix_path)
+        cached = cached.drop_duplicates(PATH_COLUMN, keep="last").reset_index(drop=True)
 
-    done = set(cached[PATH_COLUMN]) if len(cached) else set()
-    missing = labels[~labels[PATH_COLUMN].isin(done)]
-    if len(missing) == 0:
-        return cached.reset_index(drop=True)
+    missing = labels[~labels[PATH_COLUMN].isin(set(cached[PATH_COLUMN]))]
+    if len(missing):
+        print(f"Encoding {len(missing)} images ({len(cached)} already in {cache_path.name})")
+        encoder = encoder or load_pose_encoder()
+        encoded = add_pose_columns(missing, encoder, root, device)
+        cached = pd.concat([cached, encoded], ignore_index=True)
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cached.to_pickle(cache_path)
 
-    print(f"Encoding {len(missing)} images ({len(done)} already in {cache_path.name})")
-    encoder = encoder or load_pose_encoder()
-    table = pd.concat([cached, add_pose_columns(missing, encoder, root, device)], ignore_index=True)
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    table.to_pickle(cache_path)
-    return table
+    pose = cached.set_index(PATH_COLUMN)[POSE_COLUMNS]
+    return labels.join(pose, on=PATH_COLUMN)
 
 
 # --- 3. Features ---
@@ -260,7 +281,10 @@ def split_by_group(
     train_fraction: float = TRAIN_FRACTION,
     val_fraction: float = VAL_FRACTION,
 ) -> PoseSplits:
-    """Shuffle the unique groups and give train/val/test whole groups (same as notebook 31)."""
+    """Shuffle the unique groups and give train/val/test whole groups (same as notebook 31).
+
+    Raises ValueError if any split would be empty (too few groups for the fractions).
+    """
     rng = np.random.default_rng(seed)
     unique_groups = np.unique(groups)
     rng.shuffle(unique_groups)
@@ -269,6 +293,13 @@ def split_by_group(
     train_mask = np.isin(groups, unique_groups[:n_train])
     val_mask = np.isin(groups, unique_groups[n_train:n_train + n_val])
     test_mask = np.isin(groups, unique_groups[n_train + n_val:])
+    sizes = {"train": train_mask.sum(), "val": val_mask.sum(), "test": test_mask.sum()}
+    empty = [name for name, size in sizes.items() if size == 0]
+    if empty:
+        raise ValueError(
+            f"Empty split(s) {empty} from {len(unique_groups)} groups "
+            f"(train {train_fraction}, val {val_fraction}); need more groups."
+        )
     return PoseSplits(
         X[train_mask], y[train_mask],
         X[val_mask], y[val_mask],

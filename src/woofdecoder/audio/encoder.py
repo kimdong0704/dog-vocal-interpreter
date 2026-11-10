@@ -20,7 +20,7 @@ BESTS_CLONE_HINT: str = (
 )
 
 CHECKPOINTS: dict[str, Path] = {
-    "beats_iter3_plus_as2m": REPO_ROOT/"models"/"beats"/"BEATs_iter3_plus_AS2M.pt"
+    "beats_iter3_plus_as2m": REPO_ROOT/"models"/"audio"/"beats"/"BEATs_iter3_plus_AS2M.pt"
 }
 
 
