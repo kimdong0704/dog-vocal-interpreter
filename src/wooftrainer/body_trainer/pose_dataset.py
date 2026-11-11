@@ -4,7 +4,7 @@ Steps:
 1. build_label_table: one row per image with its 5-category label and split group
    (Kaggle Dog Emotion, Roboflow Dog Emotion Videos, self-labelled attention_seeking).
 2. add_pose_columns / load_or_build_pose_table: run the pose encoder (YOLO11m-pose) and keep
-   only images with exactly 1 dog. The result is cached as pose.pkl.
+   only images with exactly 1 dog. The result is cached as <data dir>/cache/body/pose.pkl.
 3. features_and_labels: 64 features per kept image (woofdecoder.body.branch.make_features) and
    integer labels in DECODER_CLASSES order.
 4. split_by_group: 70 / 15 / 15 split where a video (group) never lands in two splits.
@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from woofdata.path import get_data_dir
+from woofdata.path import branch_cache_dir, get_data_dir
 from woofdecoder.body.branch import (
     BODY_CONFIG,
     DECODER_CLASSES,
@@ -68,8 +68,7 @@ def raw_root() -> Path:
 
 
 def default_pose_cache() -> Path:
-    """Same location notebook 31 used."""
-    return raw_root() / "interim" / "pose.pkl"
+    return branch_cache_dir("body") / "pose.pkl"
 
 
 def posix_path(path: str | Path) -> str:

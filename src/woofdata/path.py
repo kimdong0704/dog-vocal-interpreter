@@ -41,3 +41,14 @@ def get_data_dir() -> Path:
 
 def data_path(relative_path: str) -> Path:
     return get_data_dir() / relative_path
+
+
+CACHE_BRANCHES: tuple[str, ...] = ("audio", "body", "scene")
+
+
+def branch_cache_dir(branch: str) -> Path:
+    """Embedding cache folder for one branch: <data dir>/cache/{audio, body, scene}."""
+    if branch not in CACHE_BRANCHES:
+        raise ValueError(f"Unknown branch {branch!r}; expected one of {CACHE_BRANCHES}")
+    load_data_dir_from_env_file()
+    return data_path(f"cache/{branch}")

@@ -11,7 +11,8 @@ Every collection has a role (COLLECTION_ROLES), which sets its splits (SPLIT_SHA
     fusion   the fusion task's own data. Split train / val / test by dog; one row per span.
              Kept out of every branch task by woofdata.tasks (collections are opt-in there).
  
-A dog may appear in one collection only, so no branch ever trains on a fusion dog.
+A dog may appear in several collections; it then gets one split, the fusion collection's
+(see assign_splits), so no branch ever trains on a fusion val / test dog.
  
 Audio is taken from the video with the app's own load_audio_16k and cut_audio, so training
 audio and app audio go through the same code. One 16 kHz WAV is written per span; window
@@ -147,12 +148,11 @@ def video_path_for(raw_dir: Path, span: dict[str, Any]) -> Path:
 def check_spans(raw_dir: Path, spans: list[dict[str, Any]]) -> None:
     """Raise ValueError listing every problem in the label rows (before any audio is read).
  
-    Checks: known category, end_s > start_s, a dog_id, the video file exists, video_id
-    unique across all collections, and each dog_id in one collection only.
+    Checks: known category, end_s > start_s, a dog_id, the video file exists, and video_id
+    unique within its collection's labels.csv.
     """
     problems: list[str] = []
-    collections_by_video: dict[str, list[str]] = {}
-    collections_by_dog: dict[str, set[str]] = {}
+    spans_per_video: Counter[tuple[str, str]] = Counter()
     for span in spans:
         name = f"{span['collection']}/{span['video_id']}"
         if span["category"] not in CATEGORIES:
@@ -163,18 +163,12 @@ def check_spans(raw_dir: Path, spans: list[dict[str, Any]]) -> None:
             problems.append(f"{name}: dog_id is empty")
         if not video_path_for(raw_dir, span).is_file():
             problems.append(f"{name}: video file missing ({video_path_for(raw_dir, span)})")
-        collections_by_video.setdefault(span["video_id"], []).append(span["collection"])
-        collections_by_dog.setdefault(span["dog_id"], set()).add(span["collection"])
- 
-    for video_id, video_collections in sorted(collections_by_video.items()):
-        if len(video_collections) > 1:
-            problems.append(f"video_id {video_id!r} is used {len(video_collections)} times")
-    for dog_id, dog_collections in sorted(collections_by_dog.items()):
-        if len(dog_collections) > 1:
-            problems.append(
-                f"dog_id {dog_id!r} is in several collections {sorted(dog_collections)}"
-            )
- 
+        spans_per_video[(span["collection"], span["video_id"])] += 1
+
+    for (collection, video_id), count in sorted(spans_per_video.items()):
+        if count > 1:
+            problems.append(f"{collection}/labels.csv: video_id {video_id!r} is used {count} times")
+
     if problems:
         raise ValueError("self_labeled label problems:\n  " + "\n  ".join(problems))
  
@@ -184,13 +178,21 @@ def assign_splits(spans: list[dict[str, Any]]) -> dict[str, str]:
  
     Each dog counts once (not per window or video), so one long video cannot fill a split
     by itself. The order is sha1 of the dog id, the same on every machine.
+
+    A dog in several collections gets one split (the manifest allows one split per dog):
+    fusion collections are assigned last, so their split wins and no branch trains on a
+    fusion val / test dog.
     """
     dogs_by_collection: dict[str, dict[str, int]] = {}
     for span in spans:
         dogs_by_collection.setdefault(span["collection"], {})[span["dog_id"]] = 1
  
     split_by_dog: dict[str, str] = {}
-    for collection, dogs_per_group in sorted(dogs_by_collection.items()):
+    def fusion_last(collection: str) -> tuple[bool, str]:
+        return (COLLECTION_ROLES[collection] == FUSION_ROLE, collection)
+
+    for collection in sorted(dogs_by_collection, key=fusion_last):
+        dogs_per_group = dogs_by_collection[collection]
         test_share, val_share = SPLIT_SHARES[COLLECTION_ROLES[collection]]
         collection_splits = balanced_group_splits(dogs_per_group, test_share, val_share)
         dogs_per_split: Counter[str] = Counter(collection_splits.values())

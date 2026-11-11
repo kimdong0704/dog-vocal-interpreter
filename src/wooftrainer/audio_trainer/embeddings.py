@@ -6,17 +6,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from woofdata.path import data_path, load_data_dir_from_env_file
+from woofdata.path import branch_cache_dir
 from woofdata.tasks import AudioContextSample, AudioEmotionSample, task_rows
 from woofdecoder.audio import AudioEncoder
 from wooftrainer.torch_datasets import TaskDataset
 
-CACHE_DIR: str = "cache/audio_embeddings"
 MANIFEST_LABEL_COLUMNS: list[str] = ["source", "dog_id", "mapped_category"]
 
 def cache_path(task: str, split: str, encoder_name: str) -> Path:
-    load_data_dir_from_env_file()
-    return data_path(f"{CACHE_DIR}/{encoder_name}/{task}_{split}.npz")
+    return branch_cache_dir("audio") / encoder_name / f"{task}_{split}.npz"
 
 def sample_labels(sample: AudioContextSample | AudioEmotionSample) -> dict[str, str]:
     if isinstance(sample, AudioContextSample):

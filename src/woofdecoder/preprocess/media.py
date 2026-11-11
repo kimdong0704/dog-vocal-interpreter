@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import av
 import numpy as np
@@ -100,9 +101,10 @@ def load_audio_16k(path: str | Path, verbose: bool = True) -> np.ndarray | None:
     
     return mono
 
-def cut_audio(audio: np.ndarray, start_s: float, end_s: float) -> np.ndarray:
-    first = round(start_s * TARGET_SAMPLE_RATE)
-    last = round(end_s * TARGET_SAMPLE_RATE)
+def cut_audio(audio: np.ndarray, start_s: Any, end_s: Any) -> np.ndarray:
+    # Any: pandas row values (itertuples/iterrows) are typed as Scalar; float() validates at runtime.
+    first = round(float(start_s) * TARGET_SAMPLE_RATE)
+    last = round(float(end_s) * TARGET_SAMPLE_RATE)
 
     return audio[first:last].copy()
 

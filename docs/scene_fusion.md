@@ -101,7 +101,7 @@ Install the project's `ml` extra. First use downloads CLIP weights to the Huggin
 Face cache. Configuration is in `branches.scene` in `configs/pipeline.yaml`.
 
 ```powershell
-python -m wooftrainer.scene_export --manifest segments.json --output cache/scene.npz
+python -m wooftrainer.scene_export --manifest segments.json  # writes data/cache/scene/scene.npz
 ```
 
 The manifest contains already-preprocessed frames. Paths are relative to its folder:
@@ -128,12 +128,13 @@ or assign labels/splits.
 
 ```python
 import numpy as np
-from wooftrainer.scene_trainer.embeddings import load_scene_cache
+from wooftrainer.scene_trainer.embeddings import default_scene_cache, load_scene_cache
 
-features, rows = load_scene_cache("cache/scene.npz", clip_ids=audio_segment_ids)
+features, rows = load_scene_cache(default_scene_cache(), clip_ids=audio_segment_ids)
 scene_probs = np.stack(rows["probs"].to_numpy())  # (N, 5)
 scene_mask = rows["present"].to_numpy()          # (N,)
 schema_id = rows.attrs["scene_schema_id"]
+schema = rows.attrs["scene_schema"]
 ```
 
 The cache stores probabilities, embeddings, masks, metadata and a schema recording
@@ -148,5 +149,15 @@ weights. Keep fixed dog-disjoint splits for fusion training and evaluation.
 
 The fusion model and runtime pipeline integration belong to the fusion teammate.
 
+
+When segments already exist in Python, call
+`cache_scene_segments(path, clip_ids, segments, encoder, metadata=metadata)`.
+`segments` may be a generator, and metadata is an optional list of genuine
+annotation dictionaries in the same order. Keep dog IDs and the team's fixed
+split assignments when constructing fusion batches.
+
+Keep availability masks alongside the vectors, and join all modalities by the
+same segment IDs and intervals. Standardization, feature selection, or projection
+must be fitted on fusion training data only, then reused for validation and test.
 
 [Notebook 41](../notebooks/41_scene_training.ipynb) preserves the earlier YOLOE comparison as a historical experiment.

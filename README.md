@@ -88,6 +88,10 @@ See the
 [scene handoff guide](docs/scene_fusion.md) for the output contract and cache API.
 Regenerate old object-detector caches after this replacement.
 
+```powershell
+python -m wooftrainer.scene_export --manifest segments.json  # writes data/cache/scene/scene.npz
+```
+
 Scene notebooks:
 - [40: CLIP image demonstration](notebooks/40_scene_zero_shot.ipynb)
 - [41: preserved YOLOE experiment](notebooks/41_scene_training.ipynb)
