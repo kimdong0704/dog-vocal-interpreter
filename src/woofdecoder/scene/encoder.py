@@ -16,11 +16,11 @@ DEFAULT_PROMPTS = dict(
     zip(
         CATEGORIES,
         (
-            "Context where a dog is showing alert or aggressive behavior.",
-            "Context where a dog is showing playful or excited behavior.",
-            "Context where a dog is showing distress or loneliness.",
-            "Context where a dog is seeking attention from a person.",
-            "Context where a dog is in another everyday situation.",
+            "dog is showing alert or aggressive behavior.",
+            "dog is showing playful or excited behavior.",
+            "dog is showing distress or loneliness.",
+            "dog is seeking attention from a person.",
+            "dog is in another everyday situation.",
         ),
         strict=True,
     )
@@ -54,11 +54,47 @@ class SceneEncoder(Branch):
         temperature=1.0,
         revision=None,
         prompts=None,
+        aggregation="mean_frame_probabilities",
+        confidence_weight=0.5,
+        class_bias=None,
     ):
         if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
             raise ValueError("batch_size must be a positive integer")
         if not np.isfinite(temperature) or temperature <= 0:
             raise ValueError("temperature must be finite and positive")
+        if aggregation not in (
+            "mean_frame_probabilities",
+            "mean_frame_logits",
+            "confidence_weighted_logits",
+        ):
+            raise ValueError(f"Unsupported scene aggregation: {aggregation!r}")
+        if (
+            isinstance(confidence_weight, bool)
+            or not np.isfinite(confidence_weight)
+            or not 0 <= confidence_weight <= 1
+        ):
+            raise ValueError("confidence_weight must be between 0 and 1")
+        # Bias values are CLIP-logit offsets in taxonomy order; zero disables correction.
+        if class_bias is None:
+            bias = np.zeros(NUM_CATEGORIES, dtype=np.float32)
+        else:
+            try:
+                values = np.asarray(class_bias)
+                if (
+                    values.shape != (NUM_CATEGORIES,)
+                    or values.dtype.kind not in "iuf"
+                    or any(
+                        isinstance(v, (bool, np.bool_))
+                        for v in np.asarray(class_bias, dtype=object)
+                    )
+                ):
+                    raise ValueError
+                with np.errstate(over="ignore", invalid="ignore"):
+                    bias = values.astype(np.float32)
+                if not np.isfinite(bias).all():
+                    raise ValueError
+            except (TypeError, ValueError) as exc:
+                raise ValueError("class_bias must contain five finite numeric values") from exc
         prompts = dict(DEFAULT_PROMPTS if prompts is None else prompts)
         if set(prompts) != set(CATEGORIES) or any(
             not isinstance(p, str) or not p.strip() for p in prompts.values()
@@ -69,6 +105,9 @@ class SceneEncoder(Branch):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.batch_size = batch_size
         self.temperature = float(temperature)
+        self.aggregation = aggregation
+        self.confidence_weight = float(confidence_weight)
+        self.class_bias = bias
         self.prompts = [prompts[category] for category in CATEGORIES]
         self.model = CLIPModel.from_pretrained(model, revision=revision).to(self.device).eval()
         self.model.requires_grad_(False)
@@ -85,10 +124,15 @@ class SceneEncoder(Branch):
             "categories": list(CATEGORIES),
             "prompts": self.prompts,
             "temperature": self.temperature,
-            "aggregation": "mean_frame_probabilities",
+            "aggregation": self.aggregation,
             "embedding_pooling": "normalized_mean_of_normalized_frame_embeddings",
             "image_processor": self.processor.image_processor.to_dict(),
         }
+        if self.aggregation == "confidence_weighted_logits":
+            self.schema["confidence_weight"] = self.confidence_weight
+        # Preserve existing cache identity when the correction is disabled.
+        if np.any(self.class_bias):
+            self.schema["class_bias"] = self.class_bias.tolist()
         self.schema_id = hashlib.sha256(
             json.dumps(self.schema, sort_keys=True).encode()
         ).hexdigest()
@@ -115,13 +159,14 @@ class SceneEncoder(Branch):
             ):
                 raise ValueError("Frames must be nonempty uint8 RGB images")
             images.append(Image.fromarray(frame))
-        probabilities, embeddings = [], []
+        probabilities, logits, embeddings = [], [], []
         self.model.eval()
         for start in range(0, len(images), self.batch_size):
             inputs = self.processor(
                 images=images[start : start + self.batch_size], return_tensors="pt"
             ).to(self.device)
             output = self.model(**inputs, **self.text_inputs)
+            logits.append(output.logits_per_image.float().cpu().numpy())
             probabilities.append(
                 (output.logits_per_image / self.temperature).softmax(dim=-1).cpu().numpy()
             )
@@ -131,6 +176,31 @@ class SceneEncoder(Branch):
             if probabilities
             else np.empty((0, NUM_CATEGORIES), dtype=np.float32)
         )
+        frame_logits = (
+            np.concatenate(logits).astype(np.float32)
+            if logits
+            else np.empty((0, NUM_CATEGORIES), dtype=np.float32)
+        )
+        if not np.isfinite(frame_logits).all():
+            raise ValueError("CLIP frame logits must be finite")
+        if not len(frame_logits):
+            probs = average_frame_probs(frame_probs)
+        elif self.aggregation == "mean_frame_probabilities":
+            # This baseline applies the same correction to each frame before averaging.
+            corrected = torch.from_numpy(frame_logits - self.class_bias) / self.temperature
+            probs = average_frame_probs(corrected.softmax(dim=-1).numpy())
+        else:
+            if self.aggregation == "confidence_weighted_logits":
+                confidence = frame_probs.max(axis=1)
+                alpha = self.confidence_weight
+                weights = (1.0 - alpha) + alpha * confidence
+                mean_logits = np.average(frame_logits, axis=0, weights=weights)
+            else:
+                mean_logits = frame_logits.mean(axis=0)
+            # Weighted confidence uses the original frame scores; bias is applied once
+            # to the segment logits, as in the held-out calibration experiment.
+            corrected = torch.from_numpy(mean_logits - self.class_bias) / self.temperature
+            probs = corrected.softmax(dim=-1).numpy()
         embedding = np.zeros(self.dim, dtype=np.float32)
         if embeddings:
             vectors = np.concatenate(embeddings).astype(np.float32)
@@ -139,8 +209,9 @@ class SceneEncoder(Branch):
             embedding /= max(float(np.linalg.norm(embedding)), 1e-12)
         return {
             "embedding": embedding,
-            "probs": average_frame_probs(frame_probs),
+            "probs": probs,
             "frame_probs": frame_probs,
+            "frame_logits": frame_logits,
             "present": bool(frames),
             "frame_count": len(frames),
             "schema_id": self.schema_id,
@@ -172,9 +243,15 @@ class SceneEncoder(Branch):
             present=result["present"],
             extras={
                 "frame_probs": result["frame_probs"].tolist(),
+                "frame_logits": result["frame_logits"].tolist(),
                 "frame_times_s": result["frame_times_s"],
                 "frame_count": result["frame_count"],
-                "aggregation": "mean_frame_probabilities",
+                "aggregation": self.aggregation,
+                "confidence_weight": self.confidence_weight
+                if self.aggregation == "confidence_weighted_logits"
+                else None,
+                # A correction alone does not establish probability calibration.
+                "class_bias_applied": bool(np.any(self.class_bias)),
                 "calibrated": False,
             },
         )
@@ -206,4 +283,7 @@ def encoder_from_config(config, device=None):
         temperature=section.get("temperature", 1.0),
         revision=section.get("revision"),
         prompts=section.get("prompts"),
+        aggregation=section.get("aggregation", "mean_frame_probabilities"),
+        confidence_weight=section.get("confidence_weight", 0.5),
+        class_bias=section.get("class_bias"),
     )

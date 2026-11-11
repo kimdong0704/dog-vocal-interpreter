@@ -35,13 +35,23 @@ branches:
     pose: models/pose/yolo11m-pose_full/best.pt  # encoder, notebook 30
     head: models/pose/heads/pose_decoder_64.pt  # decoder, notebook 31 (64 features, lr 0.003)
 
-  # Frozen CLIP scene encoder; averages frame probabilities per bark segment.
+  # Frozen CLIP scene encoder for one prediction per bark segment.
   scene:
     encoder: clip_scene_v1
     model: openai/clip-vit-base-patch32
     revision: null  # optionally pin a Hugging Face commit
     batch_size: 16
-    temperature: 1.0  # uncalibrated; average frame probabilities per segment
+    # Switch between these methods to compare them on the same held-out segments:
+    # mean_frame_probabilities: average frame probabilities (baseline).
+    # mean_frame_logits: average logits; all frames have equal weight.
+    # confidence_weighted_logits: give more weight to high-confidence frames.
+    aggregation: confidence_weighted_logits
+    confidence_weight: 0.5  # only used by confidence_weighted_logits; range 0 to 1
+    temperature: 1.0  # neutral default; replace with a training-fitted value
+    # Subtracted from the five category logits in taxonomy order: alert_aggressive,
+    # playful_excited, distressed_lonely, attention_seeking, other. Zero disables it.
+    # Replace with values fitted using training data only, not validation/test labels.
+    class_bias: [0.0, 0.0, 0.0, 0.0, 0.0]
 
 # Fusion of branch outputs (decided in notebook 50).
 fusion:

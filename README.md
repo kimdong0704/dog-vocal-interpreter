@@ -77,8 +77,10 @@ only as far as needed.
 
 The frozen CLIP scene branch lives in `src/woofdecoder/scene/encoder.py`.
 `SceneBranch.from_config().predict(segment)` returns five probabilities in the same
-category order as audio, averaged over the sampled frames inside the bark segment.
-Scores are uncalibrated. Missing video returns `present=False`.
+category order as audio, aggregated over the sampled frames inside the bark segment.
+The configuration selects experimental confidence-weighted mean logits;
+`branches.scene.aggregation` can also select mean logits or averaged frame
+probabilities. Scores are uncalibrated. Missing video returns `present=False`.
 
 The branch also exposes pooled image embeddings for fusion. Configuration is in
 `configs/pipeline.yaml`; first use downloads the pretrained CLIP checkpoint.
