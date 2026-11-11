@@ -1,1 +1,2 @@
-- Scene feature export and fusion handoff: [scene_fusion.md](scene_fusion.md)
+- CLIP scene predictions and fusion handoff: [scene_fusion.md](scene_fusion.md)
+- Preserved YOLOE comparison: [notebook 41](../notebooks/41_scene_training.ipynb)

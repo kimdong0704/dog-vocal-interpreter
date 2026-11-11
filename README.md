@@ -61,8 +61,8 @@ Preprocessing ──► extract audio · detect bark segments · sample frames p
       ├──────────────────────┬───────────────────────┐
       ▼                      ▼                       ▼
  Audio model           Body-language model        Scene model
- pretrained audio      pretrained pose model →    frozen object detector
- encoder               posture features           → pooled scene features
+ pretrained audio      pretrained pose model →    frozen CLIP encoder
+ encoder               posture features           → averaged frame scores
       └──────────────────────┼───────────────────────┘
                              ▼
                 Fusion model (+ calibration)
@@ -75,23 +75,26 @@ only as far as needed.
 
 ## Scene encoder
 
-The frozen scene encoder lives in `src/woofdecoder/scene/encoder.py`.
-Load it with `encoder_from_config(load_config())`, then call `encoder.embed(segment)`
-to get features for fusion. Its detector settings are in `configs/pipeline.yaml`.
-The scene features describe detected objects; fusion supplies the behavioral prediction.
-It reuses preprocessing's RF-DETR dog detector to replace overlapping YOLOE detections
-with canonical dog boxes. Other YOLOE objects are retained. Dog-detector settings come
-from `dog_detector`; `branches.scene.dog_overlap_iou` controls matching. Both models run
-in inference mode. Rebuild older scene caches after this change.
-Use [notebook 41](notebooks/41_scene_training.ipynb) for image examples and checks.
-Cache helpers live in `src/wooftrainer/scene_trainer/embeddings.py`.
+The frozen CLIP scene branch lives in `src/woofdecoder/scene/encoder.py`.
+`SceneBranch.from_config().predict(segment)` returns five probabilities in the same
+category order as audio, aggregated over the sampled frames inside the bark segment.
+The configuration selects experimental confidence-weighted mean logits;
+`branches.scene.aggregation` can also select mean logits or averaged frame
+probabilities. Scores are uncalibrated. Missing video returns `present=False`.
 
-Export already-preprocessed frames without a notebook:
+The branch also exposes pooled image embeddings for fusion. Configuration is in
+`configs/pipeline.yaml`; first use downloads the pretrained CLIP checkpoint.
+See the
+[scene handoff guide](docs/scene_fusion.md) for the output contract and cache API.
+Regenerate old object-detector caches after this replacement.
 
 ```powershell
 python -m wooftrainer.scene_export --manifest segments.json  # writes data/cache/scene/scene.npz
 ```
 
-The fusion teammate can load the exported features and align rows by segment ID
-without loading the detectors. See the [scene handoff guide](docs/scene_fusion.md)
-for the manifest, availability masks, and cache-loading API.
+Scene notebooks:
+- [40: CLIP image demonstration](notebooks/40_scene_zero_shot.ipynb)
+- [41: preserved YOLOE experiment](notebooks/41_scene_training.ipynb)
+
+The application pipeline currently runs audio only; the CLIP scene branch is ready
+for the fusion teammate to connect through the shared `BranchOutput` interface.

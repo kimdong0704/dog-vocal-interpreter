@@ -1,4 +1,4 @@
-"""Export aligned scene features; reading caches does not load either detector."""
+"""Export aligned scene features; reading caches does not load CLIP."""
 
 import hashlib
 import json
@@ -11,9 +11,9 @@ import pandas as pd
 from woofdata.path import branch_cache_dir
 from woofdecoder.taxonomy import CATEGORIES
 
-CACHE_FORMAT_VERSION = 2
+CACHE_FORMAT_VERSION = 3
 SEGMENT_FIELDS = ("source_id", "start_s", "end_s", "frame_times_s")
-RESERVED_FIELDS = {"clip_id", "present", "has_detections", "frame_count"}
+RESERVED_FIELDS = {"clip_id", "present", "probs", "frame_count"}
 
 
 def default_scene_cache(name="scene.npz"):
@@ -34,17 +34,12 @@ def check_ids(clip_ids):
 
 
 def schema_dimension(schema):
-    for key in ("vocabulary", "feature_names"):
-        values = schema.get(key)
-        if (
-            not isinstance(values, list)
-            or not values
-            or any(not isinstance(v, str) for v in values)
-        ):
-            raise ValueError(f"Invalid scene schema {key}")
-        if len(set(values)) != len(values):
-            raise ValueError(f"Duplicate entries in scene schema {key}")
-    return len(schema["vocabulary"]) * len(schema["feature_names"])
+    dimension = schema.get("embedding_dim")
+    if isinstance(dimension, bool) or not isinstance(dimension, int) or dimension < 1:
+        raise ValueError("Invalid scene embedding dimension")
+    if schema.get("categories") != list(CATEGORIES):
+        raise ValueError("Cached categories differ from the taxonomy")
+    return dimension
 
 
 def check_metadata(metadata, frame_count):
@@ -74,17 +69,20 @@ def check_result(result, embedding):
     count = result["frame_count"]
     if isinstance(count, bool) or not isinstance(count, (int, np.integer)) or count < 0:
         raise ValueError("frame_count must be a nonnegative integer")
-    for key in ("present", "has_detections"):
-        if not isinstance(result[key], (bool, np.bool_)):
-            raise TypeError(f"{key} must be a boolean")
+    if not isinstance(result["present"], (bool, np.bool_)):
+        raise TypeError("present must be a boolean")
     if result["present"] != (count > 0):
         raise ValueError("Availability mask disagrees with frame_count")
-    if result["has_detections"] != bool(result["detected_objects"]):
-        raise ValueError("Detection mask disagrees with detected_objects")
-    if not result["present"] and result["has_detections"]:
-        raise ValueError("Missing video cannot have detections")
-    if not result["has_detections"] and np.any(embedding):
-        raise ValueError("Empty scene detections must have a zero embedding")
+    probs = np.asarray(result["probs"])
+    if (
+        probs.shape != (len(CATEGORIES),)
+        or not np.isfinite(probs).all()
+        or (probs < 0).any()
+        or not np.isclose(probs.sum(), 1, atol=1e-5)
+    ):
+        raise ValueError("Invalid segment probabilities")
+    if not result["present"] and (np.any(embedding) or not np.allclose(probs, 1 / len(CATEGORIES))):
+        raise ValueError("Missing video needs zero features and uniform placeholder scores")
 
 
 def save_scene_cache(path, clip_ids, results, encoder, metadata=None):
@@ -117,9 +115,6 @@ def save_scene_cache(path, clip_ids, results, encoder, metadata=None):
         check_metadata(record, result["frame_count"])
         records.append(record)
     metadata_json = np.array([json.dumps(record, allow_nan=False) for record in records], dtype=str)
-    detections_json = np.array(
-        [json.dumps(result["detected_objects"], allow_nan=False) for result in results], dtype=str
-    )
     path = Path(path)
     if path.suffix.lower() != ".npz":
         raise ValueError("Scene cache path must end in .npz")
@@ -134,14 +129,11 @@ def save_scene_cache(path, clip_ids, results, encoder, metadata=None):
                 clip_id=np.array(clip_ids, dtype=str),
                 embedding=embeddings,
                 present=np.array([result["present"] for result in results], dtype=bool),
-                has_detections=np.array(
-                    [result["has_detections"] for result in results], dtype=bool
-                ),
+                probs=np.array([result["probs"] for result in results], dtype=np.float32),
                 frame_count=np.array([result["frame_count"] for result in results], dtype=np.int32),
                 schema_json=np.array(json.dumps(encoder.schema, sort_keys=True)),
                 schema_id=np.array(encoder.schema_id),
                 metadata_json=metadata_json,
-                detections_json=detections_json,
             )
         temporary.replace(path)
     finally:
@@ -169,7 +161,7 @@ def load_scene_cache(path, encoder=None, clip_ids=None, expected_schema_id=None)
             raise ValueError("Scene cache format is outdated; rebuild the cache")
         schema = json.loads(cached["schema_json"].item())
         if encoder is not None and schema != encoder.schema:
-            raise ValueError("Cached vocabulary, feature order, or detector settings differ")
+            raise ValueError("Cached CLIP model, prompts, or preprocessing settings differ")
         schema_id = schema_identity(schema)
         if cached["schema_id"].item() != schema_id:
             raise ValueError("Cached scene schema hash is invalid")
@@ -182,22 +174,20 @@ def load_scene_cache(path, encoder=None, clip_ids=None, expected_schema_id=None)
             or not np.isfinite(embeddings).all()
         ):
             raise ValueError("Cached scene embedding shape or values are invalid")
-        columns = {key: cached[key] for key in ("present", "has_detections", "frame_count")}
-        if any(values.shape != (len(ids),) for values in columns.values()):
-            raise ValueError("Cached availability columns have invalid shapes")
-        if cached["metadata_json"].shape != (len(ids),) or cached["detections_json"].shape != (
-            len(ids),
+        columns = {key: cached[key] for key in ("present", "probs", "frame_count")}
+        if any(
+            values.shape != ((len(ids), len(CATEGORIES)) if key == "probs" else (len(ids),))
+            for key, values in columns.items()
         ):
-            raise ValueError("Cached metadata or detections have invalid shapes")
+            raise ValueError("Cached availability columns have invalid shapes")
+        if cached["metadata_json"].shape != (len(ids),):
+            raise ValueError("Cached metadata has invalid shape")
         records = []
         for i, clip_id in enumerate(ids):
             metadata = json.loads(cached["metadata_json"][i])
             if not isinstance(metadata, dict) or RESERVED_FIELDS.intersection(metadata):
                 raise ValueError("Cached metadata overrides segment identifiers or masks")
             result = {key: values[i] for key, values in columns.items()}
-            result["detected_objects"] = json.loads(cached["detections_json"][i])
-            if not isinstance(result["detected_objects"], list):
-                raise TypeError("Cached detections must be a list")
             check_result(result, embeddings[i])
             check_metadata(metadata, result["frame_count"])
             records.append(
