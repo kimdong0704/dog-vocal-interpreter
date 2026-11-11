@@ -38,7 +38,7 @@ pip install -e ".[ml,dev]"
 Export from a JSON manifest without opening a notebook:
 
 ```powershell
-python -m wooftrainer.scene_export --manifest segments.json --output cache/scene.npz
+python -m wooftrainer.scene_export --manifest segments.json  # writes data/cache/scene/scene.npz
 ```
 
 Optional arguments are `--device cpu` (or `cuda`) and `--config path/to/pipeline.yaml`.
@@ -75,9 +75,9 @@ videos, find barks, extract frames, create labels, or assign train/test splits.
 Fusion training can read a cache without loading either detector or their weights:
 
 ```python
-from wooftrainer.scene_trainer.embeddings import load_scene_cache
+from wooftrainer.scene_trainer.embeddings import default_scene_cache, load_scene_cache
 
-scene_x, scene_rows = load_scene_cache("cache/scene.npz")
+scene_x, scene_rows = load_scene_cache(default_scene_cache())
 schema_id = scene_rows.attrs["scene_schema_id"]
 schema = scene_rows.attrs["scene_schema"]
 ```
@@ -94,7 +94,7 @@ on extraction order:
 
 ```python
 scene_x, scene_rows = load_scene_cache(
-    "cache/scene.npz",
+    default_scene_cache(),
     clip_ids=audio_rows["clip_id"].tolist(),
     expected_schema_id=schema_id,
 )

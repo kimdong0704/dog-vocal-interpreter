@@ -106,11 +106,17 @@ def load_segments(records):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", required=True, type=Path, help="JSON segment manifest")
-    parser.add_argument("--output", required=True, type=Path, help="Destination scene .npz cache")
+    parser.add_argument(
+        "--output", type=Path, help="Destination scene .npz cache; defaults to <data dir>/cache/scene/scene.npz"
+    )
     parser.add_argument("--device", help="Inference device, for example cpu or cuda")
     parser.add_argument("--config", type=Path, help="Pipeline YAML; defaults to the project config")
     args = parser.parse_args(argv)
     try:
+        if args.output is None:
+            from wooftrainer.scene_trainer.embeddings import default_scene_cache
+
+            args.output = default_scene_cache()
         if args.output.suffix.lower() != ".npz":
             raise ValueError("Scene cache output must use the .npz suffix")
         records = read_manifest(args.manifest)

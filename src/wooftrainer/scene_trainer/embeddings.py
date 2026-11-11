@@ -8,11 +8,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from woofdata.path import branch_cache_dir
 from woofdecoder.taxonomy import CATEGORIES
 
 CACHE_FORMAT_VERSION = 2
 SEGMENT_FIELDS = ("source_id", "start_s", "end_s", "frame_times_s")
 RESERVED_FIELDS = {"clip_id", "present", "has_detections", "frame_count"}
+
+
+def default_scene_cache(name="scene.npz"):
+    return branch_cache_dir("scene") / name
 
 
 def schema_identity(schema):
@@ -205,7 +210,7 @@ def load_scene_cache(path, encoder=None, clip_ids=None, expected_schema_id=None)
     table = pd.DataFrame(records)
     if clip_ids is not None:
         wanted = check_ids(clip_ids)
-        index = pd.Index(ids).get_indexer(wanted)
+        index = pd.Index(ids).get_indexer(pd.Index(wanted))
         if (index < 0).any():
             raise ValueError("Requested segment IDs are missing from the scene cache")
         embeddings = embeddings[index]

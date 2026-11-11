@@ -89,7 +89,7 @@ Cache helpers live in `src/wooftrainer/scene_trainer/embeddings.py`.
 Export already-preprocessed frames without a notebook:
 
 ```powershell
-python -m wooftrainer.scene_export --manifest segments.json --output cache/scene.npz
+python -m wooftrainer.scene_export --manifest segments.json  # writes data/cache/scene/scene.npz
 ```
 
 The fusion teammate can load the exported features and align rows by segment ID
