@@ -20,14 +20,13 @@ from woofdata.prepare.utils.archives import extract_members
 from woofdata.prepare.utils.audio import convert_audio
 from woofdata.prepare.utils.label_files import write_events, write_labels, write_sed_classes
 from woofdata.prepare.utils.windows import events_to_frame_targets, make_windows, save_frame_targets
+from woofdata.settings import AUDIO_DIRNAME, TARGETS_DIRNAME
 from woofdecoder.taxonomy import SED_CLASSES
 
 SOURCE: str = "esc50"
 ARCHIVE_FILENAME: str = "ESC-50.zip"
 METADATA_PATTERN: str = "*/meta/esc50.csv"
 AUDIO_PATTERN: str = "*/audio/*.wav"
-AUDIO_DIRNAME: str = "audio"
-TARGETS_DIRNAME: str = "targets"
 DOG_CATEGORY: str = "dog"
 DOG_NOTE: str = "clip-level dog label, no frame targets"
 

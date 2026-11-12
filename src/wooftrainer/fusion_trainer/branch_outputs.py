@@ -15,19 +15,21 @@ from woofdecoder.audio import AudioBranch
 from woofdecoder.base_branch import Branch, BranchOutput
 from woofdecoder.body.branch import BodyBranch
 from woofdecoder.config import load_config
+from woofdecoder.constants import BRANCH_NAMES
 from woofdecoder.preprocess.bark_detector import load_bark_detector, settings_from_config
 from woofdecoder.preprocess.bark_segments import build_segments
 from woofdecoder.preprocess.segments import BarkSegment
 from woofdecoder.scene import SceneBranch
 from woofdecoder.taxonomy import CATEGORIES
+from wooftrainer.settings import (
+    FUSION_CACHE_DIR,
+    FUSION_CACHE_INFO_FILENAME,
+    FUSION_SEGMENTS_FILENAME,
+    FUSION_VIDEOS_FILENAME,
+)
 
 FUSION_PREFIX: str = "self_labeled/fusion/"
 VIDEOS_DIR: str = "raw/self_labeled/fusion/videos"
-CACHE_DIR: str = "cache/fusion"
-SEGMENTS_FILENAME: str = "branch_outputs.csv"
-VIDEOS_FILENAME: str = "videos.csv"
-INFO_FILENAME: str = "info.json"
-BRANCH_NAMES: tuple[str, ...] = ("audio", "body", "scene")
 
 
 def fusion_videos() -> pd.DataFrame:
@@ -135,10 +137,10 @@ def append_rows(path: Path, rows: list[dict]) -> None:
 def cache_branch_outputs(device: str | None = None, verbose: bool = True) -> Path:
     config = load_config()
     videos = fusion_videos()
-    cache_dir = data_path(CACHE_DIR)
+    cache_dir = data_path(FUSION_CACHE_DIR)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    segments_path = cache_dir / SEGMENTS_FILENAME
-    videos_path = cache_dir / VIDEOS_FILENAME
+    segments_path = cache_dir / FUSION_SEGMENTS_FILENAME
+    videos_path = cache_dir / FUSION_VIDEOS_FILENAME
 
     done: set[str] = set()
     if videos_path.is_file():
@@ -151,7 +153,7 @@ def cache_branch_outputs(device: str | None = None, verbose: bool = True) -> Pat
     detector = load_bark_detector(config["bark_detector"]["model"], device, verbose=False)
     settings = settings_from_config(config)
     branches = load_branches(config, device)
-    check_or_write_info(cache_dir / INFO_FILENAME, version_info(config, branches))
+    check_or_write_info(cache_dir / FUSION_CACHE_INFO_FILENAME, version_info(config, branches))
 
     for video in videos.itertuples():
         # itertuples types every field as Scalar; fusion_videos() guarantees these types.
@@ -196,7 +198,7 @@ def cache_branch_outputs(device: str | None = None, verbose: bool = True) -> Pat
 
 def load_branch_outputs() -> tuple[pd.DataFrame, pd.DataFrame]:
     load_data_dir_from_env_file()
-    cache_dir = data_path(CACHE_DIR)
-    segments = pd.read_csv(cache_dir / SEGMENTS_FILENAME)
-    videos = pd.read_csv(cache_dir / VIDEOS_FILENAME)
+    cache_dir = data_path(FUSION_CACHE_DIR)
+    segments = pd.read_csv(cache_dir / FUSION_SEGMENTS_FILENAME)
+    videos = pd.read_csv(cache_dir / FUSION_VIDEOS_FILENAME)
     return segments, videos

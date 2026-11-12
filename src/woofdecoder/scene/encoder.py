@@ -10,6 +10,8 @@ from PIL import Image
 from woofdecoder.base_branch import Branch, BranchOutput
 from woofdecoder.taxonomy import CATEGORIES, NUM_CATEGORIES
 
+NORM_FLOOR: float = 1e-12  # smallest vector length divided by when normalizing embeddings
+
 DEFAULT_MODEL = "openai/clip-vit-base-patch32"
 # Exploratory descriptions in taxonomy order; not validated behavioral labels.
 DEFAULT_PROMPTS = dict(
@@ -204,9 +206,9 @@ class SceneEncoder(Branch):
         embedding = np.zeros(self.dim, dtype=np.float32)
         if embeddings:
             vectors = np.concatenate(embeddings).astype(np.float32)
-            vectors /= np.maximum(np.linalg.norm(vectors, axis=1, keepdims=True), 1e-12)
+            vectors /= np.maximum(np.linalg.norm(vectors, axis=1, keepdims=True), NORM_FLOOR)
             embedding = vectors.mean(axis=0)
-            embedding /= max(float(np.linalg.norm(embedding)), 1e-12)
+            embedding /= max(float(np.linalg.norm(embedding)), NORM_FLOOR)
         return {
             "embedding": embedding,
             "probs": probs,

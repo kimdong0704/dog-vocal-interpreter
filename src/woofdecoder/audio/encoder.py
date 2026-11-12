@@ -9,9 +9,8 @@ import numpy as np
 import torch
 
 from woofdecoder.config import REPO_ROOT
+from woofdecoder.constants import TARGET_SAMPLE_RATE
 from woofdecoder.preprocess.segments import BarkSegment
-
-SAMPLE_RATE: int = 16_000
 
 BEATS_DIR: Path = REPO_ROOT / "third_party" / "unilm" / "beats"
 BESTS_CLONE_HINT: str = (
@@ -32,8 +31,8 @@ class EncoderSettings:
 
 
 def check_audio(audio: np.ndarray, sample_rate: int) -> np.ndarray:
-    if sample_rate != SAMPLE_RATE:
-        raise ValueError(f"audio must be {SAMPLE_RATE} Hz, got {sample_rate} Hz")
+    if sample_rate != TARGET_SAMPLE_RATE:
+        raise ValueError(f"audio must be {TARGET_SAMPLE_RATE} Hz, got {sample_rate} Hz")
     audio = np.asarray(audio, dtype=np.float32)
     if audio.ndim != 1:
         raise ValueError(f"audio must be monon with shape (num_samples, ), got {audio.shape}")
@@ -57,8 +56,8 @@ class AudioEncoder(ABC):
     def __init__(self, settings: EncoderSettings, device: str) -> None:
         self.settings = settings
         self.device = device
-        self.min_samples = round(settings.min_seconds * SAMPLE_RATE)
-        self.chunk_samples = round(settings.chunk_seconds * SAMPLE_RATE)
+        self.min_samples = round(settings.min_seconds * TARGET_SAMPLE_RATE)
+        self.chunk_samples = round(settings.chunk_seconds * TARGET_SAMPLE_RATE)
 
     @abstractmethod
     def layer_features(
@@ -73,7 +72,7 @@ class AudioEncoder(ABC):
         """
 
     def embed_waveforms(
-        self, waveforms: list[np.ndarray], sample_rate: int = SAMPLE_RATE
+        self, waveforms: list[np.ndarray], sample_rate: int = TARGET_SAMPLE_RATE
     ) -> np.ndarray:
         chunks: list[np.ndarray] = []
         owners: list[int] = []  # which waaveform each chunk came from
@@ -159,8 +158,8 @@ class BeatsEncoder(AudioEncoder):
             layer.register_forward_hook(self.capture_layer)
 
         features, _ = self.layer_features(
-            torch.zeros(1, SAMPLE_RATE, device=device),
-            torch.zeros(1, SAMPLE_RATE, dtype=torch.bool, device=device),
+            torch.zeros(1, TARGET_SAMPLE_RATE, device=device),
+            torch.zeros(1, TARGET_SAMPLE_RATE, dtype=torch.bool, device=device),
         )
         self.num_layers = features.shape[0]
         self.dim = features.shape[-1]
@@ -197,9 +196,9 @@ def encoder_from_config(config: dict, device: str | None = None) -> AudioEncoder
         raise ValueError("branches.audio.encoder is not set in configs/pipeline.yaml")
 
     settings = EncoderSettings(
-        min_seconds=float(section.get("min_seconds", 1.0)),
-        chunk_seconds=float(section.get("chunk_seconds", 10.0)),
-        batch_size=int(section.get("batch_size", 1)),
+        min_seconds=float(section.get("min_seconds", EncoderSettings.min_seconds)),
+        chunk_seconds=float(section.get("chunk_seconds", EncoderSettings.chunk_seconds)),
+        batch_size=int(section.get("batch_size", EncoderSettings.batch_size)),
     )
 
     return load_audio_encoder(section["encoder"], settings, device)

@@ -33,29 +33,25 @@ from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.audio import write_wav_16k
 from woofdata.prepare.utils.hash_splits import balanced_group_splits
 from woofdata.prepare.utils.label_files import write_labels
-from woofdata.prepare.utils.windows import DEFAULT_WINDOW_S, make_windows
-from woofdecoder.preprocess.media import TARGET_SAMPLE_RATE, cut_audio, load_audio_16k
+from woofdata.prepare.utils.windows import make_windows
+from woofdata.settings import (
+    AUDIO_DIRNAME,
+    COLLECTION_ROLES,
+    FUSION_ROLE,
+    MIN_EVAL_DOGS,
+    SELF_LABELED_MIN_WINDOW_S,
+    SELF_LABELED_WINDOW_S,
+    SPAN_TOLERANCE_S,
+    SPLIT_SHARES,
+)
+from woofdecoder.constants import TARGET_SAMPLE_RATE
+from woofdecoder.preprocess.media import cut_audio, load_audio_16k
 from woofdecoder.taxonomy import CATEGORIES
 
 SOURCE: str = "self_labeled"
 RAW_LABELS_FILENAME: str = "labels.csv"
 VIDEOS_DIRNAME: str = "videos"
 VIDEO_SUFFIX: str = ".mp4"
-AUDIO_DIRNAME: str = "audio"
-
-BRANCH_ROLE: str = "branch"
-FUSION_ROLE: str = "fusion"
-# Every collection folder must be listed here, so a new one is added on purpose.
-COLLECTION_ROLES: dict[str, str] = {
-    "audio": BRANCH_ROLE,
-    "fusion": FUSION_ROLE,
-}
-# Role -> (test share, val share) of its dogs; the rest is train.
-SPLIT_SHARES: dict[str, tuple[float, float]] = {
-    BRANCH_ROLE: (0.0, 0.2),
-    FUSION_ROLE: (0.2, 0.2),
-}
-MIN_EVAL_DOGS: int = 4  # a val or test split with fewer dogs prints a warning
 
 REQUIRED_COLUMNS: list[str] = [
     "video_id",
@@ -66,11 +62,6 @@ REQUIRED_COLUMNS: list[str] = [
     "category",
     "labeller",
 ]
-
-WINDOW_S: float = DEFAULT_WINDOW_S
-MIN_WINDOW_S: float = 1.0  # a leftover piece shorter than this is dropped
-# How much shorter than its label a cut span may be before end_s counts as past the video.
-SPAN_TOLERANCE_S: float = 0.1
 
 SOURCE_LICENSE: str = "YouTube terms; team research use only"
 NOTES: str = "team-labelled online video; do not redistribute"
@@ -208,15 +199,15 @@ def assign_splits(spans: list[dict[str, Any]]) -> dict[str, str]:
 
 
 def window_bounds(span_s: float) -> list[tuple[float, float]]:
-    """Return (start_s, end_s) windows of at most WINDOW_S inside a span of span_s seconds.
+    """Return (start_s, end_s) windows of at most SELF_LABELED_WINDOW_S inside a span of span_s seconds.
 
     The last window ends at the span's end (no padding). A leftover piece shorter than
-    MIN_WINDOW_S is dropped, unless it is the only window (a short clip is kept whole).
+    SELF_LABELED_MIN_WINDOW_S is dropped, unless it is the only window (a short clip is kept whole).
     """
     bounds: list[tuple[float, float]] = []
-    for start_s, end_s in make_windows(span_s, WINDOW_S):
+    for start_s, end_s in make_windows(span_s, SELF_LABELED_WINDOW_S):
         end_s = round(min(end_s, span_s), 6)
-        if end_s - start_s < MIN_WINDOW_S and bounds:
+        if end_s - start_s < SELF_LABELED_MIN_WINDOW_S and bounds:
             continue
         bounds.append((start_s, end_s))
     return bounds

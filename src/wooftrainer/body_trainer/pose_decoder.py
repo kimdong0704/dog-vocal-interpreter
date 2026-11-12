@@ -21,13 +21,15 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from woofdecoder.body.branch import DECODER_CLASSES, PoseClassifier, pick_device
 from wooftrainer.body_trainer.pose_dataset import PoseSplits
+from wooftrainer.settings import (
+    POSE_DECODER_BATCH_SIZE,
+    POSE_DECODER_EPOCHS,
+    POSE_DECODER_LR,
+    POSE_DECODER_LR_VALUES,
+    POSE_DECODER_SEED,
+)
 
 NUM_CLASSES = len(DECODER_CLASSES)
-DEFAULT_LR = 0.003  # winner of the sweep in notebook 31
-DEFAULT_LR_VALUES: tuple[float, ...] = (0.0003, 0.001, 0.003)
-DEFAULT_EPOCHS = 250
-BATCH_SIZE = 64
-SEED = 42
 PRINT_EVERY = 10
 
 
@@ -44,7 +46,7 @@ def make_loader(X: np.ndarray, y: np.ndarray, shuffle: bool = False) -> DataLoad
     dataset = TensorDataset(
         torch.from_numpy(X.astype(np.float32)), torch.from_numpy(y.astype(np.int64))
     )
-    return DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=shuffle)
+    return DataLoader(dataset, batch_size=POSE_DECODER_BATCH_SIZE, shuffle=shuffle)
 
 
 def predict_logits(model: torch.nn.Module, X: np.ndarray, device: torch.device) -> np.ndarray:
@@ -76,9 +78,9 @@ class TrainHistory:
 def train_pose_decoder(
     splits: PoseSplits,
     checkpoint_path: str | Path,
-    lr: float = DEFAULT_LR,
-    num_epochs: int = DEFAULT_EPOCHS,
-    seed: int = SEED,
+    lr: float = POSE_DECODER_LR,
+    num_epochs: int = POSE_DECODER_EPOCHS,
+    seed: int = POSE_DECODER_SEED,
     device: torch.device | None = None,
     verbose: bool = True,
 ) -> TrainHistory:
@@ -142,8 +144,8 @@ def train_pose_decoder(
 def sweep_learning_rates(
     splits: PoseSplits,
     checkpoint_dir: str | Path,
-    lr_values: tuple[float, ...] = DEFAULT_LR_VALUES,
-    num_epochs: int = DEFAULT_EPOCHS,
+    lr_values: tuple[float, ...] = POSE_DECODER_LR_VALUES,
+    num_epochs: int = POSE_DECODER_EPOCHS,
     verbose: bool = False,
 ) -> pd.DataFrame:
     """One run per learning rate (same seed); checkpoints saved as decoder_lr{lr}.pt."""

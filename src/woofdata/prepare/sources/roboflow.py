@@ -30,6 +30,13 @@ from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.coco import add_coco_annotation, add_coco_image, new_coco, write_coco
 from woofdata.prepare.utils.hash_splits import balanced_group_splits
 from woofdata.prepare.utils.label_files import write_labels
+from woofdata.settings import (
+    IMAGES_DIRNAME,
+    ROBOFLOW_BALANCED_TEST_SHARE,
+    ROBOFLOW_BALANCED_VAL_SHARE,
+    ROBOFLOW_MIN_EVAL_BOWL_BOXES,
+    ROBOFLOW_MIN_EVAL_RECORDINGS,
+)
 
 # Unified categories, numbered 1.. in this order in every output (1 dog ... 5 cat).
 UNIFIED_CATEGORIES: list[str] = ["dog", "person", "leash", "bowl", "cat"]
@@ -47,7 +54,6 @@ SPLITS: tuple[str, ...] = ("train", "val", "test")
 SPLIT_BY_FOLDER: dict[str, str] = {"train": "train", "valid": "val", "test": "test"}
 ANNOTATIONS_FILENAME: str = "_annotations.coco.json"
 ARCHIVE_PATTERN: str = "*-coco.zip"
-IMAGES_DIRNAME: str = "images"
 ROBOFLOW_HASH = re.compile(r"\.rf\.[0-9a-f]+\.[a-z]+$", re.IGNORECASE)
 ORIGINAL_SUFFIX = re.compile(r"_(jpg|jpeg|png|webp)$", re.IGNORECASE)
 # Recording name formats; the first match wins and keys matching none are their own group.
@@ -58,10 +64,6 @@ RECORDING_PATTERNS: tuple[re.Pattern[str], ...] = (
     # "20251204083406_20251204085312"
     re.compile(r"^(?P<recording>\d{14}_\d{14})_\d+$"),
 )
-BALANCED_TEST_SHARE: float = 0.10
-BALANCED_VAL_SHARE: float = 0.10
-MIN_EVAL_RECORDINGS: int = 5  # report rf_bowl val / test with fewer recordings
-MIN_EVAL_BOWL_BOXES: int = 50  # report rf_bowl val / test with fewer bowl boxes
 SOURCE_LICENSE: str = "CC-BY-4.0"
 LICENSE_NOTE: str = (
     "declared by the Roboflow uploader; image provenance unknown; do not redistribute"
@@ -225,7 +227,7 @@ def plan_images(
 
     Without re-splitting, the group is the key and the split is Roboflow's. With it, the
     group is the recording and balanced_group_splits decides each group's split; val and
-    test each take MIN_EVAL_RECORDINGS recordings first. Run assign_keys first.
+    test each take ROBOFLOW_MIN_EVAL_RECORDINGS recordings first. Run assign_keys first.
     """
     plans: list[dict[str, Any]] = []
     images_per_group: Counter[str] = Counter()
@@ -247,10 +249,10 @@ def plan_images(
                 recordings.add(plan["group"])
         split_by_group = balanced_group_splits(
             images_per_group,
-            BALANCED_TEST_SHARE,
-            BALANCED_VAL_SHARE,
+            ROBOFLOW_BALANCED_TEST_SHARE,
+            ROBOFLOW_BALANCED_VAL_SHARE,
             priority_groups=recordings,
-            min_priority_groups=MIN_EVAL_RECORDINGS,
+            min_priority_groups=ROBOFLOW_MIN_EVAL_RECORDINGS,
         )
         for plan in plans:
             plan["split"] = split_by_group[plan["group"]]
@@ -392,9 +394,9 @@ def print_resplit(plans: list[dict[str, Any]], stats: dict[str, Counter[str]]) -
     print(f"  recordings per split: {recording_counts}")
     print(f"  images whose split differs from Roboflow's: {changed_count} of {len(plans)}")
     for split in ("val", "test"):
-        if recording_counts[split] < MIN_EVAL_RECORDINGS:
+        if recording_counts[split] < ROBOFLOW_MIN_EVAL_RECORDINGS:
             print(f"  WARNING: {split} has only {recording_counts[split]} recordings")
-        if stats[split]["bowl"] < MIN_EVAL_BOWL_BOXES:
+        if stats[split]["bowl"] < ROBOFLOW_MIN_EVAL_BOWL_BOXES:
             print(f"  WARNING: {split} has only {stats[split]['bowl']} bowl boxes")
 
 

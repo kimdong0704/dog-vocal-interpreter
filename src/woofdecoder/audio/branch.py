@@ -23,10 +23,6 @@ import numpy as np
 from woofdecoder.audio.encoder import AudioEncoder, encoder_from_config
 from woofdecoder.audio.features import Layer, check_layer, select_layer
 from woofdecoder.audio.head import (
-    AROUSAL_HEAD_FILENAME,
-    NUDGE_FILENAME,
-    SITUATION_HEAD_FILENAME,
-    VALENCE_HEAD_FILENAME,
     EmotionNudge,
     LinearHead,
     emotion_input_names,
@@ -34,6 +30,12 @@ from woofdecoder.audio.head import (
 )
 from woofdecoder.base_branch import Branch, BranchOutput
 from woofdecoder.config import REPO_ROOT, load_config
+from woofdecoder.constants import (
+    AROUSAL_HEAD_FILENAME,
+    NUDGE_FILENAME,
+    SITUATION_HEAD_FILENAME,
+    VALENCE_HEAD_FILENAME,
+)
 from woofdecoder.preprocess.segments import BarkSegment
 from woofdecoder.taxonomy import CATEGORIES, CATEGORY_INDEX, NUM_CATEGORIES
 

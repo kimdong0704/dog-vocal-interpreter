@@ -5,19 +5,19 @@ import math
 import numpy as np
 import torch
 
+from woofdecoder.constants import SED_CHUNK_SAMPLES, SED_SAMPLES_PER_FRAME
 from woofdecoder.preprocess.bark_detector.model import BarkDetector
-from woofdecoder.preprocess.bark_detector.timing import CHUNK_SAMPLES, SAMPLES_PER_FRAME
 from woofdecoder.taxonomy import SED_CLASSES
 
 CHUNKS_PER_BATCH: int = 8
 
 
 def predict_audioset_probs(detector: BarkDetector, audio: np.ndarray) -> np.ndarray:
-    num_frames = max(1, math.ceil(len(audio) / SAMPLES_PER_FRAME))
-    num_chunks = max(1, math.ceil(len(audio) / CHUNK_SAMPLES))
-    padded = np.zeros(num_chunks * CHUNK_SAMPLES, dtype=np.float32)
+    num_frames = max(1, math.ceil(len(audio) / SED_SAMPLES_PER_FRAME))
+    num_chunks = max(1, math.ceil(len(audio) / SED_CHUNK_SAMPLES))
+    padded = np.zeros(num_chunks * SED_CHUNK_SAMPLES, dtype=np.float32)
     padded[: len(audio)] = audio
-    chunks = padded.reshape(num_chunks, CHUNK_SAMPLES)
+    chunks = padded.reshape(num_chunks, SED_CHUNK_SAMPLES)
 
     chunk_probs: list[np.ndarray] = []
     with torch.no_grad():

@@ -8,12 +8,9 @@ import numpy as np
 import soxr
 
 from woofdecoder.config import load_config
+from woofdecoder.constants import RESAMPLE_QUALITY, TARGET_SAMPLE_RATE, TIME_TOLERANCE_S
 
-MEDIA_CONFIG = load_config()["media"]
-TARGET_SAMPLE_RATE: int = MEDIA_CONFIG["sample_rate"]  # 16k HZ
-FRAMES_PER_SEGMENT: int = MEDIA_CONFIG["frames_per_segment"]  # 4
-RESAMPLE_QUALITY: str = "HQ"  # soxr default quality value
-TIME_TOLERANCE_S: float = 0.001  # 0.999 to 1 second
+FRAMES_PER_SEGMENT: int = load_config()["media"]["frames_per_segment"]  # video frames per segment
 
 
 def describe_media(path: str | Path, verbose: bool = True) -> dict:

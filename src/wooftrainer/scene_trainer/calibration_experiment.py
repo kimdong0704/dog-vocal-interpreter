@@ -14,6 +14,12 @@ from scipy.special import logsumexp, softmax
 from sklearn.model_selection import StratifiedGroupKFold
 
 from woofdecoder.taxonomy import CATEGORIES
+from wooftrainer.settings import (
+    SCENE_BOOTSTRAP_REPEATS,
+    SCENE_BOOTSTRAP_SEED,
+    SCENE_CV_FOLDS,
+    SCENE_CV_SEED,
+)
 
 METHODS = (
     "current_weighted",
@@ -181,10 +187,10 @@ def cross_validate(
     dog_ids,
     source_urls,
     *,
-    n_splits=3,
+    n_splits=SCENE_CV_FOLDS,
     alpha=0.5,
     baseline_temperature=1.0,
-    random_state=42,
+    random_state=SCENE_CV_SEED,
     linked_group_ids=None,
 ):
     """Evaluate each variant once per held-out segment; never fit on held-out groups.
@@ -291,8 +297,8 @@ def paired_group_bootstrap(
     span_ids,
     group_ids,
     *,
-    n_boot=1000,
-    seed=42,
+    n_boot=SCENE_BOOTSTRAP_REPEATS,
+    seed=SCENE_BOOTSTRAP_SEED,
 ):
     """Bootstrap span-weighted paired log-loss difference by dog/source group.
 

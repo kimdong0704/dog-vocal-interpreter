@@ -5,7 +5,6 @@ likely communicating when it barks.
 
 | | |
 |---|---|
-| **Status** | Working end to end: preprocessing, audio / body / scene branches, a learned fusion head, and a FastAPI app (the app currently serves the audio branch; see [Limitations](#limitations)) |
 | **Course** | CSSE 473 Deep Learning, course project |
 | **Team** | Leo K. · Eden K. · Elijah H. · Rohan M. · Jackson O. |
 
@@ -76,8 +75,7 @@ Preprocessing ──► 16 kHz audio · bark detector (PretrainedSED frame_mn10)
 ```
 
 Every component starts from a **publicly available pretrained model** and is fine-tuned
-only as far as needed. The scene branch is described in
-[docs/scene_fusion.md](docs/scene_fusion.md).
+only as far as needed.
 
 ---
 
@@ -141,53 +139,6 @@ Fusion video macro-F1, 95% CI: [0.362 0.866]. Fusion − audio learned, 95% CI:
 
 ---
 
-## Quick start
-
-Python 3.12 is required. Full step-by-step setup is in [instructions.md](instructions.md).
-
-1. **Install**
-
-   ```bash
-   python -m venv .venv
-   .venv\Scripts\Activate.ps1          # macOS / Linux: source .venv/bin/activate
-   pip install -e ".[dev,data,ml,app]"
-   ```
-
-2. **`.env`**: copy `.env.example` to `.env` and fill in the dataset keys
-   ([instructions.md, Step 11](instructions.md#step-11-fill-in-the-keys)).
-   `WOOFDECODER_DATA_DIR` moves the data folder (default `data/`).
-
-3. **Download and prepare the data**
-
-   ```bash
-   python -m woofdata.download
-   python -m woofdata.prepare
-   ```
-
-4. **Get the weights that are not committed**
-
-   | File | How to get it |
-   |---|---|
-   | `third_party/PretrainedSED/` (bark detector code) | `git clone https://github.com/fschmid56/PretrainedSED.git third_party/PretrainedSED` |
-   | `models/pretrained_sed/frame_mn10_strong_1.pt` (bark detector) | Downloaded automatically on first use |
-   | `third_party/unilm/beats/` (BEATs code) | `git clone --depth 1 --filter=blob:none --sparse https://github.com/microsoft/unilm.git third_party/unilm`, then `git -C third_party/unilm sparse-checkout set beats` |
-   | `models/audio/beats/BEATs_iter3_plus_AS2M.pt` | Download `BEATs_iter3_plus_AS2M.pt` from the checkpoint table in the [BEATs README](https://github.com/microsoft/unilm/tree/master/beats) |
-   | `models/pose/yolo11m-pose_full/best.pt` | Ask the team for the trained file, or retrain with `scripts/slurm/train_pose_encoder.sbatch` and copy `weights/best.pt` here |
-   | CLIP `openai/clip-vit-base-patch32`, RF-DETR | Downloaded automatically on first use |
-
-   The audio heads (`models/audio/heads/`), the pose decoder (`models/pose/heads/`) and the
-   fusion head (`models/fusion/`) are committed.
-
-5. **Run the app**
-
-   ```bash
-   uvicorn app.api.main:app
-   ```
-
-   Then open <http://127.0.0.1:8000>.
-
----
-
 ## Limitations
 
 - **Audio source shortcut.** At first, every distressed_lonely training clip came from
@@ -202,6 +153,3 @@ Python 3.12 is required. Full step-by-step setup is in [instructions.md](instruc
   guessing among 5 categories; only the learned scene head and fusion use them well.
 - **Small test set.** Test has 18 videos with a segment, so the confidence intervals are wide
   (fusion video macro-F1 95% CI [0.362 0.866]; fusion − audio learned [-0.122 0.344]).
-- **The app runs the audio branch only.** `Pipeline` (`src/woofdecoder/pipeline.py`) does not
-  yet call the body and scene branches or the fusion head, and the `fusion:` block in
-  `configs/pipeline.yaml` still describes the old weighted average.

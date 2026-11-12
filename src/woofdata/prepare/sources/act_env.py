@@ -24,6 +24,7 @@ from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.archives import list_archive_members, open_archive, open_member
 from woofdata.prepare.utils.audio import convert_audio
 from woofdata.prepare.utils.label_files import write_labels
+from woofdata.settings import ACT_ENV_RARE_VALUE_COUNT, AUDIO_DIRNAME, MACOS_FOLDER
 from woofdecoder.taxonomy import OTHER_CATEGORY
 
 SOURCE: str = "act_env"
@@ -36,9 +37,7 @@ AUDIO_ZIPS: dict[str, list[str]] = {
     "train": ["train/split1.zip", "train/split2.zip"],
     "validation": ["validation/valid_audios.zip"],
 }
-MACOS_FOLDER: str = "__MACOSX/"
 AUDIO_SUFFIX: str = ".wav"
-AUDIO_DIRNAME: str = "audio"
 ACTIVITY_COLUMN: str = "activity"
 ENVIRONMENT_COLUMN: str = "environement"  # spelled this way in the authors' CSVs
 
@@ -71,7 +70,6 @@ LABEL_COLUMNS: list[str] = [
     ACTIVITY_COLUMN,
     "original_split",
 ]
-RARE_VALUE_COUNT: int = 5  # environment values seen fewer times are listed in the report
 
 
 def normalize_label(value: str) -> str:
@@ -191,9 +189,11 @@ def print_report(
     print_counts("clips per mapped category", categories)
     rare_values: list[str] = []
     for environment, count in sorted(Counter(environments).items()):
-        if count < RARE_VALUE_COUNT:
+        if count < ACT_ENV_RARE_VALUE_COUNT:
             rare_values.append(f"{environment!r} ({count})")
-    print(f"  environments seen fewer than {RARE_VALUE_COUNT} times: {', '.join(rare_values)}")
+    print(
+        f"  environments seen fewer than {ACT_ENV_RARE_VALUE_COUNT} times: {', '.join(rare_values)}"
+    )
     median_s = statistics.median(durations)
     print(
         f"  duration s: min {min(durations):.2f}, median {median_s:.2f}, max {max(durations):.2f}"

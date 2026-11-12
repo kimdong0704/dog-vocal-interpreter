@@ -18,6 +18,11 @@ import numpy as np
 
 from woofdata.prepare.manifest import ManifestRow
 from woofdata.prepare.sources.stanford_shared import image_key, read_index, read_stanfordextra
+from woofdata.settings import (
+    DOG_POSE_MAX_PIXEL_ERROR,
+    DOG_POSE_NUM_SPOT_CHECKS,
+    DOG_POSE_SPOT_CHECK_SEED,
+)
 
 ARCHIVE_FILENAME: str = "dog-pose.zip"
 LABELS_FOLDER: str = "labels"
@@ -26,9 +31,6 @@ FOLDER_TO_SPLIT: dict[str, str] = {"train": "train", "val": "test"}
 STANFORDEXTRA_SOURCE: str = "stanfordextra"
 NUM_KEYPOINTS: int = 24
 BOX_VALUES: int = 5  # class, cx, cy, w, h before the keypoints
-NUM_SPOT_CHECKS: int = 50
-SPOT_CHECK_SEED: int = 0
-MAX_PIXEL_ERROR: float = 2.0
 CONSISTENCY_FILENAME: str = "consistency.txt"
 
 
@@ -88,7 +90,9 @@ def spot_check(
     all_labels: dict[str, list[float]] = {}
     for folder_labels in labels.values():
         all_labels.update(folder_labels)
-    keys = random.Random(SPOT_CHECK_SEED).sample(sorted(all_labels), NUM_SPOT_CHECKS)
+    keys = random.Random(DOG_POSE_SPOT_CHECK_SEED).sample(
+        sorted(all_labels), DOG_POSE_NUM_SPOT_CHECKS
+    )
 
     max_error = 0.0
     visibility_disagreements = 0
@@ -104,11 +108,11 @@ def spot_check(
             errors = np.abs(yolo[both, :2] - joints[both, :2])  # shape (num_both, 2)
             max_error = max(max_error, float(errors.max()))
     status = "MISMATCH"
-    if max_error <= MAX_PIXEL_ERROR and visibility_disagreements == 0:
+    if max_error <= DOG_POSE_MAX_PIXEL_ERROR and visibility_disagreements == 0:
         status = "OK"
     line = (
-        f"{status}: {NUM_SPOT_CHECKS} images (seed {SPOT_CHECK_SEED}): max keypoint error "
-        f"{max_error:.2f} px (limit {MAX_PIXEL_ERROR}), "
+        f"{status}: {DOG_POSE_NUM_SPOT_CHECKS} images (seed {DOG_POSE_SPOT_CHECK_SEED}): max keypoint error "
+        f"{max_error:.2f} px (limit {DOG_POSE_MAX_PIXEL_ERROR}), "
         f"{visibility_disagreements} keypoints labelled in only one of the two"
     )
     return [line]

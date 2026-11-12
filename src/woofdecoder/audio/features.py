@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-LAYER_MEAN: str = "mean"
+from woofdecoder.constants import LAYER_MEAN
+
 Layer = int | str
 
 

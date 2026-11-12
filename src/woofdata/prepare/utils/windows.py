@@ -7,8 +7,8 @@ from pathlib import Path
 
 import numpy as np
 
-DEFAULT_WINDOW_S: float = 10.0
-DEFAULT_FRAME_S: float = 0.04  # 25 frames per second, 250 frames per 10 s window
+from woofdata.settings import DEFAULT_FRAME_S, DEFAULT_WINDOW_S
+
 # Tolerance for float rounding when an event boundary falls exactly on a frame boundary.
 FRAME_BOUNDARY_EPSILON: float = 1e-6
 

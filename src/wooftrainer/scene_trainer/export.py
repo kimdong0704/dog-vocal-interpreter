@@ -9,7 +9,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from woofdecoder.preprocess.segments import TIME_TOLERANCE_S, BarkSegment
+from woofdecoder.constants import TIME_TOLERANCE_S
+from woofdecoder.preprocess.segments import BarkSegment
 from woofdecoder.taxonomy import CATEGORIES
 
 SEGMENT_COLUMNS = {

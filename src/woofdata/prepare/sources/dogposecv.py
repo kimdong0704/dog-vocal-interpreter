@@ -25,7 +25,6 @@ from woofdata.fileio import read_csv, relative_data_path, write_csv
 from woofdata.path import get_data_dir
 from woofdata.prepare.manifest import ManifestRow, make_clip_id, processed_dir
 from woofdata.prepare.sources.stanford_shared import (
-    BOXES_FILENAME,
     STANFORD_DOGS,
     image_key,
     read_index,
@@ -33,6 +32,7 @@ from woofdata.prepare.sources.stanford_shared import (
 from woofdata.prepare.utils.archives import open_member
 from woofdata.prepare.utils.coco import add_coco_annotation, add_coco_image, new_coco, write_coco
 from woofdata.prepare.utils.label_files import write_labels
+from woofdata.settings import BOXES_FILENAME
 
 SOURCE: str = "dogposecv"
 LABELS_ARCHIVE: str = "data/labels.tar.gz"

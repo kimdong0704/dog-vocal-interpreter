@@ -3,7 +3,7 @@
 Raw files: raw/audioset_strong_eval/data/eval-*.parquet with columns
     video_id: str, audio: {bytes, path}, labels / human_labels: list[str],
     events: list[{start, end, event_name}]  (event_name is the human-readable class name)
-Every clip with at least one event in AUDIOSET_TO_SED is kept, plus NUM_NEGATIVES clips
+Every clip with at least one event in AUDIOSET_TO_SED is kept, plus AUDIOSET_NUM_NEGATIVES clips
 without one (other animals and everyday sounds), so the bark detector's false alarms show.
 No dog ids exist, so each clip is its own dog; all clips share one leakage group.
 """
@@ -21,12 +21,18 @@ from woofdata.fileio import relative_data_path
 from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.audio import convert_audio
 from woofdata.prepare.utils.label_files import (
-    EVENTS_FILENAME,
     write_events,
     write_labels,
     write_sed_classes,
 )
 from woofdata.prepare.utils.windows import events_to_frame_targets, make_windows, save_frame_targets
+from woofdata.settings import (
+    AUDIO_DIRNAME,
+    AUDIOSET_NEGATIVE_SEED,
+    AUDIOSET_NUM_NEGATIVES,
+    EVENTS_FILENAME,
+    TARGETS_DIRNAME,
+)
 from woofdecoder.taxonomy import SED_CLASSES
 
 # AudioSet strong-label event names. AudioSet "Pant" is a human breathing class, so it is
@@ -45,12 +51,8 @@ AUDIOSET_TO_SED: dict[str, str] = {
 
 SOURCE: str = "audioset_strong_eval"
 PARQUET_PATTERN: str = "data/eval-*.parquet"
-NUM_NEGATIVES: int = 300
-NEGATIVE_SEED: int = 0
 BATCH_ROWS: int = 32  # audio bytes per batch stay around 40 MB
 LEAKAGE_GROUP: str = "audioset"
-AUDIO_DIRNAME: str = "audio"
-TARGETS_DIRNAME: str = "targets"
 SOURCE_LICENSE: str = "CC-BY-4.0"
 NOTES: str = (
     "Google raters; optimistic: bark detector was trained on AudioSet; "
@@ -70,10 +72,10 @@ def has_dog_event(events: list[dict[str, Any]]) -> bool:
 
 
 def select_clips(parquet_paths: list[Path]) -> tuple[list[str], list[str]]:
-    """Return (video ids with a dog event, NUM_NEGATIVES sampled video ids without one).
+    """Return (video ids with a dog event, AUDIOSET_NUM_NEGATIVES sampled video ids without one).
 
     Only the video_id and events columns are read. Negatives are sampled with
-    NEGATIVE_SEED from the sorted remaining ids, so every machine picks the same ones.
+    AUDIOSET_NEGATIVE_SEED from the sorted remaining ids, so every machine picks the same ones.
     """
     dog_ids: list[str] = []
     other_ids: list[str] = []
@@ -84,7 +86,9 @@ def select_clips(parquet_paths: list[Path]) -> tuple[list[str], list[str]]:
                 dog_ids.append(row["video_id"])
             else:
                 other_ids.append(row["video_id"])
-    negative_ids = random.Random(NEGATIVE_SEED).sample(sorted(other_ids), NUM_NEGATIVES)
+    negative_ids = random.Random(AUDIOSET_NEGATIVE_SEED).sample(
+        sorted(other_ids), AUDIOSET_NUM_NEGATIVES
+    )
     return sorted(dog_ids), sorted(negative_ids)
 
 

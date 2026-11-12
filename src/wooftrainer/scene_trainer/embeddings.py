@@ -10,8 +10,8 @@ import pandas as pd
 
 from woofdata.path import branch_cache_dir
 from woofdecoder.taxonomy import CATEGORIES
+from wooftrainer.settings import SCENE_CACHE_FORMAT_VERSION
 
-CACHE_FORMAT_VERSION = 3
 SEGMENT_FIELDS = ("source_id", "start_s", "end_s", "frame_times_s")
 RESERVED_FIELDS = {"clip_id", "present", "probs", "frame_count"}
 
@@ -125,7 +125,7 @@ def save_scene_cache(path, clip_ids, results, encoder, metadata=None):
             temporary = Path(stream.name)
             np.savez_compressed(
                 stream,
-                format_version=np.array(CACHE_FORMAT_VERSION),
+                format_version=np.array(SCENE_CACHE_FORMAT_VERSION),
                 clip_id=np.array(clip_ids, dtype=str),
                 embedding=embeddings,
                 present=np.array([result["present"] for result in results], dtype=bool),
@@ -156,7 +156,7 @@ def load_scene_cache(path, encoder=None, clip_ids=None, expected_schema_id=None)
     with np.load(path, allow_pickle=False) as cached:
         if (
             "format_version" not in cached
-            or cached["format_version"].item() != CACHE_FORMAT_VERSION
+            or cached["format_version"].item() != SCENE_CACHE_FORMAT_VERSION
         ):
             raise ValueError("Scene cache format is outdated; rebuild the cache")
         schema = json.loads(cached["schema_json"].item())

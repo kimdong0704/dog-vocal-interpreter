@@ -11,31 +11,36 @@ from sklearn.metrics import f1_score, log_loss
 from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
-from woofdecoder.audio.features import LAYER_MEAN, Layer, select_layer
+from woofdecoder.audio.features import Layer, select_layer
 from woofdecoder.audio.head import (
-    AROUSAL_HEAD_FILENAME,
-    NUDGE_FILENAME,
-    SITUATION_HEAD_FILENAME,
-    VALENCE_HEAD_FILENAME,
     EmotionNudge,
     LinearHead,
     emotion_input_names,
     emotion_inputs,
     softmax,
 )
+from woofdecoder.constants import (
+    AROUSAL_HEAD_FILENAME,
+    LAYER_MEAN,
+    NUDGE_FILENAME,
+    SITUATION_HEAD_FILENAME,
+    VALENCE_HEAD_FILENAME,
+)
 from wooftrainer.audio_trainer.embeddings import attach_labels, load_embeddings
-
-DEFAULT_C_VALUES: tuple[float, ...] = (0.00003, 0.0001, 0.0003, 0.001, 0.003, 0.01, 0.1, 1.0)
-NUM_FOLDS: int = 5
-SEED: int = 0
-MAX_ITER: int = 3000
-TEMPERATURE_BOUNDS: tuple[float, float] = (0.25, 10.0)
+from wooftrainer.settings import (
+    AUDIO_C_VALUES,
+    CV_SEED,
+    MAX_ITER,
+    MIN_NUDGE_GAIN,
+    NUDGE_L2_VALUES,
+    NUM_FOLDS,
+    SCORE_PROB_FLOOR,
+    TEMPERATURE_BOUNDS,
+)
 
 MISSING_CLASS_LOGIT: float = -30.0
 
-DEFAULT_L2_VALUES: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0)
 NO_NUDGE: str = "none"  # the "no nudge" row of the nudge table
-MIN_NUDGE_GAIN: float = 0.01
 EMOTION_TASK: str = "audio_emotion"
 SITUATION_TASK: str = "audio_context"
 TRAIN_SPLIT: str = "train"
@@ -123,7 +128,7 @@ def make_folds(
     labels: np.ndarray,
     groups: np.ndarray | None = None,
     num_folds: int = NUM_FOLDS,
-    seed: int = SEED,
+    seed: int = CV_SEED,
 ) -> Folds:
     placeholder = np.zeros(len(labels))
     if groups is None:
@@ -171,7 +176,7 @@ def choose_C(
     labels: np.ndarray,
     weights: np.ndarray,
     folds: Folds,
-    C_values: tuple[float, ...] = DEFAULT_C_VALUES,
+    C_values: tuple[float, ...] = AUDIO_C_VALUES,
 ) -> tuple[float, pd.DataFrame]:
     results: list[dict[str, float]] = []
     for C in C_values:
@@ -230,7 +235,7 @@ def fit_nudge_weights(
         probs = softmax(logits + inputs @ nudge_weights.T)  # shape (n, num_classes)
 
         true_class_probs = np.clip(
-            (probs * targets).sum(axis=1), 1e-12, None
+            (probs * targets).sum(axis=1), SCORE_PROB_FLOOR, None
         )  # prediction number for true class
         # -mean(log_likelihood) --> cross-entropy loss
         # weights are flattened weights (n, )
@@ -284,7 +289,7 @@ def choose_nudge_l2(
     classes: list[str],
     weights: np.ndarray,
     folds: Folds,
-    l2_values: tuple[float, ...] = DEFAULT_L2_VALUES,
+    l2_values: tuple[float, ...] = NUDGE_L2_VALUES,
 ) -> tuple[float | None, pd.DataFrame]:
     results: list[dict] = []
 
@@ -372,8 +377,8 @@ def train_emotion_head(
 def train_audio_heads(
     encoder_name: str,
     layer: Layer,
-    C_values: tuple[float, ...] = DEFAULT_C_VALUES,
-    l2_values: tuple[float, ...] = DEFAULT_L2_VALUES,
+    C_values: tuple[float, ...] = AUDIO_C_VALUES,
+    l2_values: tuple[float, ...] = NUDGE_L2_VALUES,
     balance_sources: bool = True,
 ) -> AudioHeads:
     # Encoder -> embeddings for emotional heads

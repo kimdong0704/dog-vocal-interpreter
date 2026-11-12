@@ -2,7 +2,6 @@
 
 from woofdecoder.audio.branch import AudioBranch, load_heads, to_categories_order
 from woofdecoder.audio.encoder import (
-    SAMPLE_RATE,
     AudioEncoder,
     EncoderSettings,
     check_audio,
@@ -10,12 +9,8 @@ from woofdecoder.audio.encoder import (
     load_audio_encoder,
     split_into_chunks,
 )
-from woofdecoder.audio.features import LAYER_MEAN, Layer, check_layer, select_layer
+from woofdecoder.audio.features import Layer, check_layer, select_layer
 from woofdecoder.audio.head import (
-    AROUSAL_HEAD_FILENAME,
-    NUDGE_FILENAME,
-    SITUATION_HEAD_FILENAME,
-    VALENCE_HEAD_FILENAME,
     EmotionNudge,
     LinearHead,
     emotion_input_names,
@@ -24,12 +19,6 @@ from woofdecoder.audio.head import (
 )
 
 __all__ = [
-    "AROUSAL_HEAD_FILENAME",
-    "LAYER_MEAN",
-    "NUDGE_FILENAME",
-    "SAMPLE_RATE",
-    "SITUATION_HEAD_FILENAME",
-    "VALENCE_HEAD_FILENAME",
     "AudioBranch",
     "AudioEncoder",
     "EmotionNudge",

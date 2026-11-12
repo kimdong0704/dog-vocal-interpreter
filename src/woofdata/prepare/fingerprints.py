@@ -18,9 +18,14 @@ from woofdata.download.datasets import load_datasets
 from woofdata.download.reporter import folder_stats
 from woofdata.fileio import read_csv, write_json
 from woofdata.prepare import splits
-from woofdata.prepare.manifest import ROWS_FILENAME, processed_dir
-from woofdata.prepare.sources.stanford_shared import BOXES_FILENAME, INDEX_FILENAME
-from woofdata.prepare.utils.label_files import EVENTS_FILENAME, LABELS_FILENAME
+from woofdata.prepare.manifest import processed_dir
+from woofdata.settings import (
+    BOXES_FILENAME,
+    EVENTS_FILENAME,
+    INDEX_FILENAME,
+    LABELS_FILENAME,
+    ROWS_FILENAME,
+)
 
 FINGERPRINTS_FILENAME: str = "fingerprints.json"
 FINGERPRINT_COLUMNS: list[str] = ["clip_id", "split", "mapped_category"]

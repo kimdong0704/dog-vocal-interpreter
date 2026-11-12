@@ -19,13 +19,13 @@ from woofdata.fileio import read_csv, relative_data_path
 from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.audio import convert_audio
 from woofdata.prepare.utils.label_files import write_labels
+from woofdata.settings import AUDIO_DIRNAME
 
 SOURCE: str = "emotional_canines"
 BREEDS: tuple[str, ...] = ("husky", "shiba")
 # Author split folder -> manifest split. "test" is left out on purpose: it has no labels.
 SPLIT_BY_FOLDER: dict[str, str] = {"train": "train_only", "validation": "val"}
 UNLABELLED_FOLDER: str = "test"
-AUDIO_DIRNAME: str = "audio"
 LEAKAGE_GROUP: str = "barkopedia_pool"
 SOURCE_LICENSE: str = "CC-BY-NC-SA-4.0"
 NOTES: str = "annotation method not documented; relicensed from MIT on 2026-09-16"

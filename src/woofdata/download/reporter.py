@@ -16,6 +16,7 @@ from dataset_downloader.providers.detect import detect
 
 from woofdata.download.datasets import load_datasets
 from woofdata.path import ENV_FILE, get_data_dir
+from woofdata.settings import DOWNLOAD_SIZE_SHORTFALL_TOLERANCE
 
 # Credentials the datasets in configs/datasets.yaml use.
 CREDENTIAL_NAMES: tuple[str, ...] = (
@@ -34,7 +35,6 @@ IGNORED_DIR_NAMES: tuple[str, ...] = (".cache",)
 RESUME_STATE_SUFFIX: str = ".part"
 
 # A folder this much smaller than approx_size_gb is flagged.
-SIZE_SHORTFALL_TOLERANCE: float = 0.10
 BYTES_PER_GB: float = 1e9
 
 
@@ -178,7 +178,7 @@ def size_flag(stats: FolderStats, expected_gb: float | None) -> str:
         return "not in datasets.yaml"
 
     size_gb = stats.total_bytes / BYTES_PER_GB
-    smallest_ok_gb = expected_gb * (1 - SIZE_SHORTFALL_TOLERANCE)
+    smallest_ok_gb = expected_gb * (1 - DOWNLOAD_SIZE_SHORTFALL_TOLERANCE)
 
     if size_gb < smallest_ok_gb:
         return "too small"

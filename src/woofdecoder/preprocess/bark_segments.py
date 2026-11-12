@@ -5,8 +5,8 @@ from pathlib import Path
 
 import numpy as np
 
+from woofdecoder.constants import SED_FRAME_S, TARGET_SAMPLE_RATE
 from woofdecoder.preprocess.bark_detector import (
-    FRAME_S,
     BarkDetector,
     DetectionSettings,
     detect_sed_probs,
@@ -14,7 +14,6 @@ from woofdecoder.preprocess.bark_detector import (
     vocal_score,
 )
 from woofdecoder.preprocess.media import (
-    TARGET_SAMPLE_RATE,
     cut_audio,
     load_audio_16k,
     sample_frames,
@@ -56,8 +55,8 @@ def find_sound_sections(
     sections: list[SoundSection] = []
     for label, first_frame, end_frame in runs:
         span_s = (
-            round(event_start_s + first_frame * FRAME_S, 3),
-            round(event_start_s + end_frame * FRAME_S, 3),
+            round(event_start_s + first_frame * SED_FRAME_S, 3),
+            round(event_start_s + end_frame * SED_FRAME_S, 3),
         )
         score = float(event_probs[first_frame:end_frame, SED_CLASSES.index(label)].mean())
         sections.append(SoundSection(label, span_s, score))
@@ -66,7 +65,7 @@ def find_sound_sections(
 
 
 def frame_range(start_s: float, end_s: float) -> slice:
-    return slice(round(start_s / FRAME_S), round(end_s / FRAME_S))
+    return slice(round(start_s / SED_FRAME_S), round(end_s / SED_FRAME_S))
 
 
 def build_segments(
@@ -93,7 +92,7 @@ def build_segments(
     # SED class probs
     sed_probs = detect_sed_probs(detector, audio)  # shape (num_frames, 6)
     if verbose:
-        print(f"Scored {len(sed_probs)} frames of {FRAME_S * 1000:.0f} ms")
+        print(f"Scored {len(sed_probs)} frames of {SED_FRAME_S * 1000:.0f} ms")
 
     # events
     events = find_dog_events(vocal_score(sed_probs), settings)

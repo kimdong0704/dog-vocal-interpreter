@@ -17,16 +17,10 @@ import pandas as pd
 
 from woofdata.fileio import read_csv
 from woofdata.path import load_data_dir_from_env_file
-from woofdata.prepare.manifest import MANIFEST_FILENAME, processed_dir
-from woofdata.prepare.utils.windows import DEFAULT_WINDOW_S
+from woofdata.prepare.manifest import processed_dir
+from woofdata.settings import CLIP_MAX_SECONDS, EVAL_SPLITS, MANIFEST_FILENAME, TRAIN_SPLITS
 
-# Manifest split values that count as training for every task. train_only rows (labels
-# not trusted enough to report on) are trained on but never evaluated.
-TRAIN_SPLITS: tuple[str, ...] = ("train", "train_only")
-EVAL_SPLITS: tuple[str, ...] = ("val", "test")
 TEST_REMINDER: str = "Reminder: test is reported once, at the end. Tune on val."
-# Act_Env clips run up to 93 s; the clip-level audio tasks keep the centre of each clip.
-CLIP_MAX_SECONDS: float = DEFAULT_WINDOW_S
 
 
 # --- Samples: what load_sample returns for each task ---

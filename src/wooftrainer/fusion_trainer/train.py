@@ -7,11 +7,8 @@ import pandas as pd
 from sklearn.metrics import f1_score, log_loss
 
 from woofdecoder.audio.head import softmax
+from woofdecoder.constants import BRANCH_NAMES, FEATURE_NAMES, FUSION_ENCODER, FUSION_LAYER
 from woofdecoder.fusion.fusers import (
-    BRANCH_NAMES,
-    FEATURE_NAMES,
-    FUSION_ENCODER,
-    FUSION_LAYER,
     FusionModel,
     fusion_features,
     head_to_categories,
@@ -25,9 +22,7 @@ from wooftrainer.audio_trainer.audio_heads import (
     make_folds,
     out_of_fold_logits,
 )
-
-TRAINVAL_SPLITS: tuple[str, ...] = ("train", "val")
-FUSION_C_VALUES: tuple[float, ...] = (0.001, 0.01, 0.1, 1.0, 10.0, 100.0)
+from wooftrainer.settings import FUSION_C_VALUES, SCORE_PROB_FLOOR, TRAINVAL_SPLITS
 
 # Which of the 18 inputs each learned method may use.
 METHOD_COLUMNS: dict[str, list[int]] = {}
@@ -104,7 +99,7 @@ def sorted_columns(probs: np.ndarray) -> np.ndarray:
 def score(probs: np.ndarray, segments: pd.DataFrame, weights: np.ndarray) -> dict[str, float]:
     labels = segments["category"].to_numpy()
     predicted = np.array(CATEGORIES)[probs.argmax(axis=1)]
-    clipped = np.clip(probs, 1e-12, 1.0)
+    clipped = np.clip(probs, SCORE_PROB_FLOOR, 1.0)
     per_video = pd.DataFrame(probs, columns=CATEGORIES)
     per_video["video_id"] = segments["video_id"].to_numpy()
     per_video["category"] = labels

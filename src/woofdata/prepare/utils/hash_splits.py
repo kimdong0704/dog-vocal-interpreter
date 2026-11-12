@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 
-HASH_BUCKETS: int = 100  # split_from_hash: sha1(key) mod 100
+from woofdata.settings import HASH_BUCKETS
 
 
 def split_from_hash(key: str, train_below: int, val_below: int) -> str:

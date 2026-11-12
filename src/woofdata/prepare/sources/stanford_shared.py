@@ -18,10 +18,13 @@ import numpy as np
 from woofdata.fileio import read_csv
 from woofdata.prepare.manifest import processed_dir
 from woofdata.prepare.utils.hash_splits import split_from_hash
+from woofdata.settings import (
+    INDEX_FILENAME,
+    STANFORD_TRAIN_BELOW,
+    STANFORD_VAL_BELOW,
+)
 
 STANFORD_DOGS: str = "stanford_dogs"
-INDEX_FILENAME: str = "index.csv"
-BOXES_FILENAME: str = "boxes.csv"
 
 STANFORDEXTRA_ARCHIVE: str = "stanford-dogs-dataset-for-animal-pose-estimation.zip"
 STANFORDEXTRA_JSON: str = "StanfordExtra_V12/StanfordExtra_v12.json"
@@ -32,10 +35,6 @@ STANFORDEXTRA_SPLIT_FILES: dict[str, str] = {
     "test": "StanfordExtra_V12/test_stanford_StanfordExtra_v12.npy",
 }
 
-# Images outside StanfordExtra: sha1(image key) mod 100 below these bounds -> the split.
-TRAIN_BELOW: int = 70
-VAL_BELOW: int = 85
-
 
 def image_key(path: str) -> str:
     """Return the image key, the file name without folder or suffix: "n02085620_10074"."""
@@ -44,7 +43,7 @@ def image_key(path: str) -> str:
 
 def hash_split(key: str) -> str:
     """Return train / val / test from sha1(key) mod 100 (<70 train, <85 val, else test)."""
-    return split_from_hash(key, TRAIN_BELOW, VAL_BELOW)
+    return split_from_hash(key, STANFORD_TRAIN_BELOW, STANFORD_VAL_BELOW)
 
 
 def shared_split(key: str, official_splits: dict[str, str]) -> str:

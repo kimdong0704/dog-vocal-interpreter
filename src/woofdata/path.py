@@ -4,7 +4,9 @@ import os
 import re
 from pathlib import Path
 
+from woofdata.settings import CACHE_DIRNAME
 from woofdecoder.config import REPO_ROOT
+from woofdecoder.constants import BRANCH_NAMES
 
 DATA_DIR_ENV_VAR: str = "WOOFDECODER_DATA_DIR"
 ENV_FILE: Path = REPO_ROOT / ".env"
@@ -43,12 +45,9 @@ def data_path(relative_path: str) -> Path:
     return get_data_dir() / relative_path
 
 
-CACHE_BRANCHES: tuple[str, ...] = ("audio", "body", "scene")
-
-
 def branch_cache_dir(branch: str) -> Path:
     """Embedding cache folder for one branch: <data dir>/cache/{audio, body, scene}."""
-    if branch not in CACHE_BRANCHES:
-        raise ValueError(f"Unknown branch {branch!r}; expected one of {CACHE_BRANCHES}")
+    if branch not in BRANCH_NAMES:
+        raise ValueError(f"Unknown branch {branch!r}; expected one of {BRANCH_NAMES}")
     load_data_dir_from_env_file()
-    return data_path(f"cache/{branch}")
+    return data_path(f"{CACHE_DIRNAME}/{branch}")

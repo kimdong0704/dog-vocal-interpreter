@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from woofdecoder.preprocess.bark_detector.timing import FRAME_S
+from woofdecoder.constants import SED_FRAME_S
 from woofdecoder.taxonomy import SED_CLASSES
 
 Event = tuple[float, float]  # (start_s, end_s)
@@ -23,7 +23,7 @@ class DetectionSettings:
 
 
 def frames_to_events(
-    active_frames: np.ndarray, frame_s: float = FRAME_S
+    active_frames: np.ndarray, frame_s: float = SED_FRAME_S
 ) -> list[tuple[float, float]]:
 
     events: list[tuple[float, float]] = []
@@ -40,7 +40,9 @@ def frames_to_events(
     return events
 
 
-def events_to_frames(events: list[Event], num_frames: int, frame_s: float = FRAME_S) -> np.ndarray:
+def events_to_frames(
+    events: list[Event], num_frames: int, frame_s: float = SED_FRAME_S
+) -> np.ndarray:
     # Opposite of frames_to_events: [(0.04, 0.12)] with 4 frames -> [F, T, T, F]
     # lets frame metrics score the cleaned events
     active_frames = np.zeros(num_frames, dtype=bool)

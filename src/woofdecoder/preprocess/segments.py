@@ -7,9 +7,8 @@ from typing import NamedTuple
 
 import numpy as np
 
+from woofdecoder.constants import TARGET_SAMPLE_RATE, TIME_TOLERANCE_S
 from woofdecoder.taxonomy import SED_CLASSES
-
-TIME_TOLERANCE_S: float = 1e-3
 
 
 class SoundSection(NamedTuple):
@@ -55,7 +54,7 @@ class BarkSegment:
     start_s: float
     end_s: float
     audio: np.ndarray | None = None
-    sample_rate: int = 16_000
+    sample_rate: int = TARGET_SAMPLE_RATE
     frames: list[np.ndarray] = field(default_factory=list)
     frame_times_s: list[float] = field(default_factory=list)
     source_id: str = ""

@@ -7,7 +7,7 @@ import soundfile
 
 from woofdata.loader.annotations import Row
 from woofdata.path import data_path
-from woofdata.prepare.utils.audio import TARGET_SAMPLE_RATE
+from woofdecoder.constants import TARGET_SAMPLE_RATE
 
 
 def load_audio_segment(row: Row, max_seconds: float | None = None) -> np.ndarray:

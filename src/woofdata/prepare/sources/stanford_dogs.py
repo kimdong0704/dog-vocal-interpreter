@@ -24,8 +24,6 @@ import pandas as pd
 from woofdata.fileio import relative_data_path, write_csv
 from woofdata.prepare.manifest import ManifestRow
 from woofdata.prepare.sources.stanford_shared import (
-    BOXES_FILENAME,
-    INDEX_FILENAME,
     image_key,
     read_stanfordextra,
     shared_split,
@@ -37,12 +35,12 @@ from woofdata.prepare.utils.archives import (
     open_member,
     select_members,
 )
+from woofdata.settings import BOXES_FILENAME, IMAGES_DIRNAME, INDEX_FILENAME
 
 ARCHIVE: str = "stanford-dogs-dataset.zip"
 IMAGES_PATTERN: str = "images/Images/*.jpg"
 ANNOTATIONS_PATTERN: str = "annotations/Annotation/*"
 ARCHIVE_IMAGES_FOLDER: str = "images/Images"
-IMAGES_DIRNAME: str = "images"
 STANFORDEXTRA_SOURCE: str = "stanfordextra"
 INDEX_COLUMNS: list[str] = [
     "image_key",

@@ -8,13 +8,9 @@ from typing import Any
 import pandas as pd
 
 from woofdata.fileio import write_csv, write_json
+from woofdata.settings import EVENTS_FILENAME, LABELS_FILENAME, SED_CLASSES_FILENAME
 from woofdecoder.taxonomy import SED_CLASSES
 
-SED_CLASSES_FILENAME: str = "sed_classes.json"
-EVENTS_FILENAME: str = "events.csv"
-# clip_id plus every original label column of the source, for labels the manifest has no
-# column for (environment, arousal, the authors' split, ...).
-LABELS_FILENAME: str = "labels.csv"
 # One row per annotated event; sed_class is "" when the label maps to no SED class.
 EVENT_COLUMNS: list[str] = ["clip_id", "start_s", "end_s", "sed_class", "original_label"]
 

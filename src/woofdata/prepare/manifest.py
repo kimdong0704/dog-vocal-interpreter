@@ -14,11 +14,8 @@ import pandas as pd
 from woofdata.download.datasets import load_datasets
 from woofdata.fileio import read_csv, to_posix_path, write_csv
 from woofdata.path import get_data_dir
+from woofdata.settings import MANIFEST_FILENAME, PROCESSED_DIRNAME, ROWS_FILENAME
 from woofdecoder.taxonomy import CATEGORIES
-
-PROCESSED_DIRNAME: str = "processed"
-MANIFEST_FILENAME: str = "manifest.csv"
-ROWS_FILENAME: str = "rows.csv"
 
 SPLITS: tuple[str, ...] = ("train", "val", "test", "train_only")
 MODALITIES: tuple[str, ...] = ("audio", "image")

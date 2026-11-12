@@ -8,25 +8,17 @@ import numpy as np
 
 from woofdecoder.audio.head import LinearHead
 from woofdecoder.base_branch import BranchOutput
+from woofdecoder.constants import (
+    BRANCH_NAMES,
+    FEATURE_NAMES,
+    FUSION_HEAD_FILENAME,
+    FUSION_INFO_FILENAME,
+    PROB_FLOOR,
+)
 from woofdecoder.taxonomy import CATEGORIES, NUM_CATEGORIES
 
 # features (18) = for audio, body, scene: present * centred log-probabilities (5 each) + 3 present flags
 # probs (5) = softmax((W @ standardised features + b) / T)   (a LinearHead)
-
-BRANCH_NAMES: tuple[str, ...] = ("audio", "body", "scene")
-PROB_FLOOR: float = 1e-6  # so log(0) cannot occur
-FUSION_HEAD_FILENAME: str = "fusion_head.npz"
-FUSION_INFO_FILENAME: str = "fusion_info.json"
-# LinearHead stores which encoder and layer it reads; for fusion these are fixed labels.
-FUSION_ENCODER: str = "fusion_v1"
-FUSION_LAYER: str = "mean"
-
-FEATURE_NAMES: list[str] = []
-for _branch in BRANCH_NAMES:
-    for _category in CATEGORIES:
-        FEATURE_NAMES.append(f"{_branch}:{_category}")
-for _branch in BRANCH_NAMES:
-    FEATURE_NAMES.append(f"{_branch}:present")
 
 
 def fusion_features(probs: dict[str, np.ndarray], present: dict[str, bool]) -> np.ndarray:

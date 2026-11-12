@@ -9,8 +9,7 @@ from woofdata.loader.audio.segment import load_audio_segment
 from woofdata.path import data_path
 from woofdata.prepare.manifest import processed_dir
 from woofdata.prepare.sources import esc50
-from woofdata.prepare.utils.label_files import SED_CLASSES_FILENAME
-from woofdata.prepare.utils.windows import DEFAULT_FRAME_S, DEFAULT_WINDOW_S
+from woofdata.settings import DEFAULT_FRAME_S, DEFAULT_WINDOW_S, SED_CLASSES_FILENAME
 from woofdata.tasks import AudioContextSample, AudioEmotionSample, BarkDetectorSample
 from woofdecoder.taxonomy import SED_CLASSES
 

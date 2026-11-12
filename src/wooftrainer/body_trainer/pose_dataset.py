@@ -32,6 +32,13 @@ from woofdecoder.body.branch import (
     pick_device,
 )
 from woofdecoder.config import REPO_ROOT
+from wooftrainer.settings import (
+    POSE_CACHE_FILENAME,
+    POSE_ENCODER_BATCH_SIZE,
+    POSE_SPLIT_SEED,
+    POSE_TRAIN_FRACTION,
+    POSE_VAL_FRACTION,
+)
 
 PATH_COLUMN = "path to image"  # relative to raw_root()
 TABLE_COLUMNS: list[str] = [PATH_COLUMN, "source", "original_label", "category", "group"]
@@ -57,10 +64,6 @@ ROBOFLOW_MAP: dict[str, str] = {
 SELF_LABELED_DIR = Path("self_labeled_attention_seeking")
 
 LABEL_INDEX: dict[str, int] = {name: index for index, name in enumerate(DECODER_CLASSES)}
-BATCH_SIZE = 32  # images per encoder call (larger batches overflowed the buffer)
-SEED = 42
-TRAIN_FRACTION = 0.70
-VAL_FRACTION = 0.15  # test gets the rest
 
 
 def raw_root() -> Path:
@@ -68,7 +71,7 @@ def raw_root() -> Path:
 
 
 def default_pose_cache() -> Path:
-    return branch_cache_dir("body") / "pose.pkl"
+    return branch_cache_dir("body") / POSE_CACHE_FILENAME
 
 
 def posix_path(path: str | Path) -> str:
@@ -183,7 +186,7 @@ def drop_reason(n_dogs: int) -> str:
 
 
 def run_pose_encoder(
-    encoder, paths: list[Path], device: str | None = None, batch_size: int = BATCH_SIZE
+    encoder, paths: list[Path], device: str | None = None, batch_size: int = POSE_ENCODER_BATCH_SIZE
 ) -> pd.DataFrame:
     """Columns n_dogs, kept, drop_reason, box (4,), keypoints (20, 3); one row per path."""
     device = device or str(pick_device())
@@ -286,9 +289,9 @@ def split_by_group(
     X: np.ndarray,
     y: np.ndarray,
     groups: np.ndarray,
-    seed: int = SEED,
-    train_fraction: float = TRAIN_FRACTION,
-    val_fraction: float = VAL_FRACTION,
+    seed: int = POSE_SPLIT_SEED,
+    train_fraction: float = POSE_TRAIN_FRACTION,
+    val_fraction: float = POSE_VAL_FRACTION,
 ) -> PoseSplits:
     """Shuffle the unique groups and give train/val/test whole groups (same as notebook 31).
 

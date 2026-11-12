@@ -16,7 +16,7 @@ import numpy as np
 from woofdata.fileio import read_csv
 from woofdata.path import data_path
 from woofdata.prepare.manifest import processed_dir
-from woofdata.prepare.utils.label_files import LABELS_FILENAME
+from woofdata.settings import LABELS_FILENAME
 from woofdecoder.taxonomy import SED_CLASSES
 
 

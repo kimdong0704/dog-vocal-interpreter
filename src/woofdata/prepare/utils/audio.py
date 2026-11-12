@@ -8,10 +8,9 @@ from pathlib import Path
 import numpy as np
 import soundfile
 
-from woofdecoder.config import load_config
+from woofdecoder.constants import TARGET_SAMPLE_RATE
 from woofdecoder.preprocess.media import to_mono_16k
 
-TARGET_SAMPLE_RATE: int = load_config()["media"]["sample_rate"]
 WAV_ENCODING: str = "PCM_16"
 # soxr "HQ" quality: deterministic and good enough for 16 kHz speech-band audio.
 # RESAMPLE_QUALITY: str = "HQ"

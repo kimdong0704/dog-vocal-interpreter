@@ -31,12 +31,19 @@ from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.archives import list_archive_members, open_archive, open_member
 from woofdata.prepare.utils.audio import convert_audio
 from woofdata.prepare.utils.label_files import (
-    EVENTS_FILENAME,
     write_events,
     write_labels,
     write_sed_classes,
 )
 from woofdata.prepare.utils.windows import events_to_frame_targets, make_windows, save_frame_targets
+from woofdata.settings import (
+    AUDIO_DIRNAME,
+    EVENTS_FILENAME,
+    MACOS_FOLDER,
+    PLAYPANT_NUM_VAL_DOGS,
+    PLAYPANT_SPLIT_SEED,
+    TARGETS_DIRNAME,
+)
 from woofdecoder.taxonomy import SED_CLASSES
 
 # PlayPanT letter codes (06 Readme.txt). J (Sneeze), K (Shake) and L (Human
@@ -58,14 +65,11 @@ RECORDINGS_ARCHIVE: str = "03 Play session recordings.zip"
 ANNOTATIONS_ARCHIVE: str = "04 Annotations.zip"
 METADATA_FILENAME: str = "05 Metadata.csv"
 METADATA_SEPARATOR: str = ";"
-MACOS_FOLDER: str = "__MACOSX/"
 RECORDING_SUFFIX: str = ".wav"
 LAYER1_SUFFIX: str = ".Table.1.selections.txt"
 LAYER2_SUFFIX: str = ".Table"
 LAYER_1: str = "layer 1"
 LAYER_2: str = "layer 2"
-AUDIO_DIRNAME: str = "audio"
-TARGETS_DIRNAME: str = "targets"
 
 # Layer 2 text -> readme letter code. Layer 2 spells some names differently from the
 # readme ("Grunt", "Human"); Howl (G) is listed though no session contains one.
@@ -84,8 +88,6 @@ LAYER2_TEXT_TO_CODE: dict[str, str] = {
     "Human": "L",
 }
 
-SPLIT_SEED: int = 0
-NUM_VAL_DOGS: int = 9  # the other 8 dogs go to test
 MAPPED_CATEGORY: str = "playful_excited"
 ORIGINAL_LABEL: str = "dog-human play"
 # datasets.yaml pins no revision for the Zenodo record, so the version is named here.
@@ -132,15 +134,15 @@ def window_label_rows(
 
 
 def assign_dog_splits(dog_ids: list[str]) -> dict[str, str]:
-    """Shuffle the sorted, unique dog ids with SPLIT_SEED; the first NUM_VAL_DOGS go to val.
+    """Shuffle the sorted, unique dog ids with PLAYPANT_SPLIT_SEED; the first PLAYPANT_NUM_VAL_DOGS go to val.
 
     random.Random gives the same order on every machine and Python 3 version.
     """
     shuffled = sorted(set(dog_ids))
-    random.Random(SPLIT_SEED).shuffle(shuffled)
+    random.Random(PLAYPANT_SPLIT_SEED).shuffle(shuffled)
     split_by_dog: dict[str, str] = {}
     for position, dog_id in enumerate(shuffled):
-        if position < NUM_VAL_DOGS:
+        if position < PLAYPANT_NUM_VAL_DOGS:
             split_by_dog[dog_id] = "val"
         else:
             split_by_dog[dog_id] = "test"

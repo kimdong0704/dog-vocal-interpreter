@@ -5,14 +5,8 @@ from pathlib import Path
 
 import numpy as np
 
-from woofdecoder.audio.features import LAYER_MEAN, Layer, check_layer
-
-FORMAT_VERSION: int = 1
-
-SITUATION_HEAD_FILENAME: str = "situation_head.npz"
-AROUSAL_HEAD_FILENAME: str = "arousal_head.npz"
-VALENCE_HEAD_FILENAME: str = "valence_head.npz"
-NUDGE_FILENAME: str = "emotion_nudge.npz"
+from woofdecoder.audio.features import Layer, check_layer
+from woofdecoder.constants import HEAD_FORMAT_VERSION, LAYER_MEAN
 
 
 def softmax(logits: np.ndarray) -> np.ndarray:
@@ -29,8 +23,8 @@ def layer_from_text(text: str) -> Layer:
 
 def check_format(path: Path, data: np.lib.npyio.NpzFile) -> None:
     version = int(data["format_version"])
-    if version != FORMAT_VERSION:
-        raise ValueError(f"{path} has format version {version}, expected {FORMAT_VERSION}")
+    if version != HEAD_FORMAT_VERSION:
+        raise ValueError(f"{path} has format version {version}, expected {HEAD_FORMAT_VERSION}")
 
 
 @dataclass
@@ -100,7 +94,7 @@ class LinearHead:
         path.parent.mkdir(parents=True, exist_ok=True)
         np.savez(
             path,
-            format_version=np.array(FORMAT_VERSION),
+            format_version=np.array(HEAD_FORMAT_VERSION),
             classes=np.array(self.classes, dtype=str),
             weights=self.weights,
             bias=self.bias,
@@ -153,7 +147,7 @@ class EmotionNudge:
         path.parent.mkdir(parents=True, exist_ok=True)
         np.savez(
             path,
-            format_version=np.array(FORMAT_VERSION),
+            format_version=np.array(HEAD_FORMAT_VERSION),
             classes=np.array(self.classes, dtype=str),
             inputs=np.array(self.inputs, dtype=str),
             weights=self.weights,

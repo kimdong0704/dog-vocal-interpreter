@@ -4,7 +4,7 @@ load_bark_detector()           model.py           the pretrained frame_mn10
 detect_sed_probs(det, audio)   predict.py         audio -> (num_frames, 6) probabilities
 find_dog_events(probs, ...)    events.py          probabilities -> cleaned events
 PRETRAINED_SED_DIR             pretrained_sed.py  where the third-party repo is cloned
-FRAME_S                        timing.py          0.04 s per frame
+SED_FRAME_S                    constants.py       0.04 s per frame
 """
 
 from woofdecoder.preprocess.bark_detector.events import (
@@ -30,14 +30,11 @@ from woofdecoder.preprocess.bark_detector.predict import (
     to_sed_probs,
 )
 from woofdecoder.preprocess.bark_detector.pretrained_sed import PRETRAINED_SED_DIR
-from woofdecoder.preprocess.bark_detector.timing import FRAME_S, SAMPLE_RATE
 
 __all__ = [
     "AUDIOSET_CLASSES_PER_SED",
     "EVENT_CLASSES",
-    "FRAME_S",
     "PRETRAINED_SED_DIR",
-    "SAMPLE_RATE",
     "BarkDetector",
     "DetectionSettings",
     "detect_sed_probs",
