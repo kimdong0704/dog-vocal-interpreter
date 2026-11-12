@@ -7,7 +7,7 @@ from typing import Any
 
 import pandas as pd
 
-from woofdata.utils_fileio import write_csv, write_json
+from woofdata.fileio import write_csv, write_json
 from woofdecoder.taxonomy import SED_CLASSES
 
 SED_CLASSES_FILENAME: str = "sed_classes.json"

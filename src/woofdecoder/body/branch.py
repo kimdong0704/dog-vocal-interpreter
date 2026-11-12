@@ -64,10 +64,10 @@ def parse_result(r) -> dict:
     """Read one Ultralytics result: keep the frame only if exactly 1 dog was found."""
     n = len(r.boxes)
     if n != 1:
-        return dict(n_dogs=n, kept=False, box=None, keypoints=None)
+        return {"n_dogs": n, "kept": False, "box": None, "keypoints": None}
     box = r.boxes.xyxy[0].cpu().numpy()  # (4,) x1, y1, x2, y2 in pixels
     kpts = r.keypoints.data[0, :NUM_KEYPOINTS].cpu().numpy()  # (20, 3) x, y, conf
-    return dict(n_dogs=1, kept=True, box=box, keypoints=kpts)
+    return {"n_dogs": 1, "kept": True, "box": box, "keypoints": kpts}
 
 
 def make_features(K: np.ndarray, B: np.ndarray) -> np.ndarray:

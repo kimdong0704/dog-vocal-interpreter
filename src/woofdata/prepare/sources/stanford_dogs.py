@@ -21,6 +21,7 @@ from xml.etree import ElementTree
 
 import pandas as pd
 
+from woofdata.fileio import relative_data_path, write_csv
 from woofdata.prepare.manifest import ManifestRow
 from woofdata.prepare.sources.stanford_shared import (
     BOXES_FILENAME,
@@ -36,7 +37,6 @@ from woofdata.prepare.utils.archives import (
     open_member,
     select_members,
 )
-from woofdata.utils_fileio import relative_data_path, write_csv
 
 ARCHIVE: str = "stanford-dogs-dataset.zip"
 IMAGES_PATTERN: str = "images/Images/*.jpg"

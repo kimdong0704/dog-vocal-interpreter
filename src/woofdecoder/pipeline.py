@@ -1,7 +1,7 @@
 """Clip -> predictions. For now: preprocessing (bark detector) + audio branch only.
 
-    segments = build_segments(clip)            one BarkSegment per detected dog sound
-    output   = audio_branch.predict(segment)   5 category probabilities + extras
+segments = build_segments(clip)            one BarkSegment per detected dog sound
+output   = audio_branch.predict(segment)   5 category probabilities + extras
 """
 
 from __future__ import annotations

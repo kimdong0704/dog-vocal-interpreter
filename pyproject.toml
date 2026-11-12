@@ -8,29 +8,56 @@ version = "0.1.0"
 description = "Multimodal dog vocalization interpreter: audio + body language + scene context"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
+# Core: what woofdecoder imports at module level (av and soxr read and resample media).
 dependencies = [
     "av",
     "numpy",
-    "pandas",
     "pillow",
     "pyyaml",
-    "soundfile",
-    "soxr", 
-    "tqdm",
-    "dataset-downloader @ git+https://github.com/kimdong0704/dataset-downloader.git@v0.1.0",
+    "soxr",
 ]
 
 [project.optional-dependencies]
-ml = ["torch", "torchaudio", "torchvision", "transformers", "huggingface_hub", "librosa", "scikit-learn", "rfdetr", "ultralytics>=8.4.194"]
-# Data preparation: soxr resamples audio, pyarrow reads the AudioSet parquet files.
-data = ["pyarrow"]
-app = ["fastapi", "uvicorn[standard]", "python-multipart", "gradio"]
-dev = ["pytest", "ruff", "ipykernel", "nbstripout", "matplotlib"]
+# Training and model inference. woofdecoder: torch, transformers (CLIP), ultralytics (YOLO
+# pose), rfdetr (dog detector); torchaudio is imported by the BEATs code and torchvision by the
+# bark detector (both in third_party/). wooftrainer: matplotlib, pandas, scikit-learn, scipy.
+ml = [
+    "matplotlib",
+    "pandas",
+    "rfdetr",
+    "scikit-learn",
+    "scipy",
+    "torch",
+    "torchaudio",
+    "torchvision",
+    "transformers",
+    "ultralytics>=8.4.194",
+]
+# Data download and preparation (woofdata): pyarrow reads the AudioSet parquet files and
+# soundfile writes the prepared audio.
+data = [
+    "dataset-downloader @ git+https://github.com/kimdong0704/dataset-downloader.git@v0.1.0",
+    "pandas",
+    "pyarrow",
+    "soundfile",
+]
+# The FastAPI app (python-multipart handles the uploaded clip). The app also needs `ml`.
+app = [
+    "fastapi",
+    "python-multipart",
+    "uvicorn[standard]",
+]
+# Linting and notebooks (tqdm is used by notebooks 15, 40 and 50).
+dev = [
+    "ipykernel",
+    "matplotlib",
+    "nbstripout",
+    "ruff",
+    "tqdm",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100

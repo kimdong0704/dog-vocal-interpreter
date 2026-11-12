@@ -5,7 +5,7 @@ likely communicating when it barks.
 
 | | |
 |---|---|
-| **Status** | Early development. No results yet |
+| **Status** | Working end to end: preprocessing, audio / body / scene branches, a learned fusion head, and a FastAPI app (the app currently serves the audio branch; see [Limitations](#limitations)) |
 | **Course** | CSSE 473 Deep Learning, course project |
 | **Team** | Leo K. · Eden K. · Elijah H. · Rohan M. · Jackson O. |
 
@@ -56,45 +56,152 @@ Does fusing all three modalities outperform the best single modality?
 Uploaded video
       │
       ▼
-Preprocessing ──► extract audio · detect bark segments · sample frames per bark
+Preprocessing ──► 16 kHz audio · bark detector (PretrainedSED frame_mn10) → bark segments
+      │           · frames sampled per segment
       │
-      ├──────────────────────┬───────────────────────┐
-      ▼                      ▼                       ▼
- Audio model           Body-language model        Scene model
- pretrained audio      pretrained pose model →    frozen CLIP encoder
- encoder               posture features           → averaged frame scores
-      └──────────────────────┼───────────────────────┘
+      ├──────────────────────┬───────────────────────────┐
+      ▼                      ▼                           ▼
+ Audio branch           Body branch                 Scene branch
+ frozen BEATs           YOLO11m-pose (fine-tuned)   frozen CLIP ViT-B/32
+ → linear heads         → keypoint features         → zero-shot scores,
+ (situation, arousal,   → pose decoder (MLP)          aggregated over frames
+  valence)
+      │ 5 probabilities      │ 5 probabilities           │ 5 probabilities
+      └──────────────────────┼───────────────────────────┘
                              ▼
-                Fusion model (+ calibration)
+     Learned fusion head: logistic regression on the 15 branch probabilities
+     + 3 branch-present flags, with a fitted temperature (models/fusion/)
                              ▼
              Probabilities over the 5 categories per bark
 ```
 
 Every component starts from a **publicly available pretrained model** and is fine-tuned
-only as far as needed.
+only as far as needed. The scene branch is described in
+[docs/scene_fusion.md](docs/scene_fusion.md).
 
-## Scene encoder
+---
 
-The frozen CLIP scene branch lives in `src/woofdecoder/scene/encoder.py`.
-`SceneBranch.from_config().predict(segment)` returns five probabilities in the same
-category order as audio, aggregated over the sampled frames inside the bark segment.
-The configuration selects experimental confidence-weighted mean logits;
-`branches.scene.aggregation` can also select mean logits or averaged frame
-probabilities. Scores are uncalibrated. Missing video returns `present=False`.
+## Results
 
-The branch also exposes pooled image embeddings for fusion. Configuration is in
-`configs/pipeline.yaml`; first use downloads the pretrained CLIP checkpoint.
-See the
-[scene handoff guide](docs/scene_fusion.md) for the output contract and cache API.
-Regenerate old object-detector caches after this replacement.
+Fusion collection: 100 self-labeled videos, split by dog into 60 train / 20 val / 20 test
+videos. All choices (C, temperature, inputs) were made on train + val; test was scored once.
+Numbers are copied from the saved outputs of notebooks 51 and 52.
 
-```powershell
-python -m wooftrainer.scene_export --manifest segments.json  # writes data/cache/scene/scene.npz
-```
+**Train + val, out-of-fold** ([notebook 51](notebooks/51_fusion_fitting.ipynb); 589
+segments, 76 videos):
 
-Scene notebooks:
-- [40: CLIP image demonstration](notebooks/40_scene_zero_shot.ipynb)
-- [41: preserved YOLOE experiment](notebooks/41_scene_training.ipynb)
+| Method | Segment log-loss | Segment macro-F1 | Video macro-F1 | Video accuracy |
+|---|---|---|---|---|
+| audio raw | 1.429 | 0.475 | 0.475 | 0.487 |
+| body raw | 1.940 | 0.319 | 0.308 | 0.342 |
+| scene raw | 1.949 | 0.171 | 0.155 | 0.237 |
+| average raw | 1.398 | 0.399 | 0.452 | 0.461 |
+| audio learned | 1.310 | 0.425 | 0.511 | 0.526 |
+| body learned | 1.484 | 0.333 | 0.362 | 0.355 |
+| scene learned | 1.450 | 0.291 | 0.285 | 0.289 |
+| **fusion learned** | **1.089** | **0.556** | **0.564** | **0.566** |
 
-The application pipeline currently runs audio only; the CLIP scene branch is ready
-for the fusion teammate to connect through the shared `BranchOutput` interface.
+Fusion − audio learned, segment log-loss: -0.219 [-0.332, -0.103] (fusion lower in 100% of
+2,000 video-level resamples).
+
+**Test, scored once** ([notebook 52](notebooks/52_fusion_test.ipynb); 111 segments,
+18 videos with a segment, 2 videos with none):
+
+| Method | Segment log-loss | Segment macro-F1 | Video macro-F1 | Video accuracy |
+|---|---|---|---|---|
+| audio raw | 1.518 | 0.410 | 0.371 | 0.389 |
+| body raw | 2.177 | 0.300 | 0.291 | 0.278 |
+| scene raw | 1.667 | 0.427 | 0.508 | 0.611 |
+| average raw | 1.386 | 0.418 | 0.549 | 0.556 |
+| audio learned | 1.226 | 0.477 | 0.538 | 0.611 |
+| body learned | 1.524 | 0.353 | 0.280 | 0.278 |
+| scene learned | 1.075 | 0.588 | 0.628 | 0.611 |
+| **fusion learned** | **0.834** | 0.581 | **0.687** | **0.667** |
+
+Fusion video macro-F1, 95% CI: [0.362 0.866]. Fusion − audio learned, 95% CI:
+[-0.122 0.344] (fusion ahead in 82% of resamples).
+
+---
+
+## Repository structure
+
+| Path | Contents |
+|---|---|
+| `app/` | FastAPI web app (`app/api/main.py`): upload a clip, get predictions per bark |
+| `configs/` | `pipeline.yaml` (the settings the app reads) and `datasets.yaml` (dataset list) |
+| `data/` | Local datasets and caches (not committed), except the shared splits in `data/splits/` |
+| `docs/` | Extra documentation; see [docs/INDEX.md](docs/INDEX.md) |
+| `models/` | Model weights; only the small trained heads (`*/heads/`) and `models/fusion/` are committed |
+| `notebooks/` | Experiments, numbered by area: 0x data, 1x preprocessing, 2x audio, 3x body, 4x scene, 5x fusion |
+| `scripts/` | Cluster job scripts (`slurm/train_pose_encoder.sbatch`) |
+| `src/woofdecoder/` | What the app runs: preprocessing, the audio / body / scene branches, fusion, `Pipeline` |
+| `src/woofdata/` | Dataset download (`python -m woofdata.download`), preparation (`python -m woofdata.prepare`) and loading |
+| `src/wooftrainer/` | Training and evaluation code, one sub-package per area (`<area>_trainer/`), plus shared plots |
+| `third_party/` | Cloned PretrainedSED and BEATs source code (not committed) |
+
+---
+
+## Quick start
+
+Python 3.12 is required. Full step-by-step setup is in [instructions.md](instructions.md).
+
+1. **Install**
+
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\Activate.ps1          # macOS / Linux: source .venv/bin/activate
+   pip install -e ".[dev,data,ml,app]"
+   ```
+
+2. **`.env`**: copy `.env.example` to `.env` and fill in the dataset keys
+   ([instructions.md, Step 11](instructions.md#step-11-fill-in-the-keys)).
+   `WOOFDECODER_DATA_DIR` moves the data folder (default `data/`).
+
+3. **Download and prepare the data**
+
+   ```bash
+   python -m woofdata.download
+   python -m woofdata.prepare
+   ```
+
+4. **Get the weights that are not committed**
+
+   | File | How to get it |
+   |---|---|
+   | `third_party/PretrainedSED/` (bark detector code) | `git clone https://github.com/fschmid56/PretrainedSED.git third_party/PretrainedSED` |
+   | `models/pretrained_sed/frame_mn10_strong_1.pt` (bark detector) | Downloaded automatically on first use |
+   | `third_party/unilm/beats/` (BEATs code) | `git clone --depth 1 --filter=blob:none --sparse https://github.com/microsoft/unilm.git third_party/unilm`, then `git -C third_party/unilm sparse-checkout set beats` |
+   | `models/audio/beats/BEATs_iter3_plus_AS2M.pt` | Download `BEATs_iter3_plus_AS2M.pt` from the checkpoint table in the [BEATs README](https://github.com/microsoft/unilm/tree/master/beats) |
+   | `models/pose/yolo11m-pose_full/best.pt` | Ask the team for the trained file, or retrain with `scripts/slurm/train_pose_encoder.sbatch` and copy `weights/best.pt` here |
+   | CLIP `openai/clip-vit-base-patch32`, RF-DETR | Downloaded automatically on first use |
+
+   The audio heads (`models/audio/heads/`), the pose decoder (`models/pose/heads/`) and the
+   fusion head (`models/fusion/`) are committed.
+
+5. **Run the app**
+
+   ```bash
+   uvicorn app.api.main:app
+   ```
+
+   Then open <http://127.0.0.1:8000>.
+
+---
+
+## Limitations
+
+- **Audio source shortcut.** At first, every distressed_lonely training clip came from
+  YouTube and nothing else did, so the audio head partly learned "YouTube audio" instead of
+  distress. Balancing sources inside each category (notebook 23) cut non-distressed YouTube
+  clips called distressed from 74% to 31%, and on new val dogs none were (notebook 24).
+  Some lean toward distressed remains for unclear clips.
+- **Valence is near chance.** Valence log-loss 1.036 is only 6% better than a blind guess
+  (notebook 22); it is kept in `extras` as a weak hint and should not be shown as a result.
+- **Raw scene scores are below chance.** Zero-shot CLIP scores on train + val reach a
+  segment macro-F1 of 0.171 and a video macro-F1 of 0.155 (notebook 51), below the 0.2 of
+  guessing among 5 categories; only the learned scene head and fusion use them well.
+- **Small test set.** Test has 18 videos with a segment, so the confidence intervals are wide
+  (fusion video macro-F1 95% CI [0.362 0.866]; fusion − audio learned [-0.122 0.344]).
+- **The app runs the audio branch only.** `Pipeline` (`src/woofdecoder/pipeline.py`) does not
+  yet call the body and scene branches or the fusion head, and the `fusion:` block in
+  `configs/pipeline.yaml` still describes the old weighted average.

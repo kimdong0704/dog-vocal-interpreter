@@ -26,6 +26,7 @@ from typing import Any
 
 import pandas as pd
 
+from woofdata.fileio import relative_data_path
 from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.archives import list_archive_members, open_archive, open_member
 from woofdata.prepare.utils.audio import convert_audio
@@ -36,7 +37,6 @@ from woofdata.prepare.utils.label_files import (
     write_sed_classes,
 )
 from woofdata.prepare.utils.windows import events_to_frame_targets, make_windows, save_frame_targets
-from woofdata.utils_fileio import relative_data_path
 from woofdecoder.taxonomy import SED_CLASSES
 
 # PlayPanT letter codes (06 Readme.txt). J (Sneeze), K (Shake) and L (Human

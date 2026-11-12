@@ -12,8 +12,8 @@ from pathlib import Path, PurePath
 import pandas as pd
 
 from woofdata.download.datasets import load_datasets
+from woofdata.fileio import read_csv, to_posix_path, write_csv
 from woofdata.path import get_data_dir
-from woofdata.utils_fileio import read_csv, to_posix_path, write_csv
 from woofdecoder.taxonomy import CATEGORIES
 
 PROCESSED_DIRNAME: str = "processed"

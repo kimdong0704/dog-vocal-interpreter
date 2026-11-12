@@ -17,13 +17,14 @@ class SoundSection(NamedTuple):
     span_s: tuple[float, float]
     score: float
 
+
 @dataclass
 class BarkSegment:
     """One vocalization, passed from the preprocessing step to the branches.
- 
+
     Preprocessing runs the bark detector on the audio and a dog detector on each sampled
     frame, then packs everything one branch needs about one vocalization in here.
- 
+
     Attributes:
         start_s: Start time in the source clip, in seconds.
         end_s: End time in the source clip, in seconds. Must not be before start_s.
@@ -46,7 +47,7 @@ class BarkSegment:
             stretch where one sound is strongest, e.g.
             [("growl", (1.20, 1.40), 0.41), ("bark", (1.40, 1.64), 0.22)].
             Empty if unknown (for example hand-marked stand-in segments).
- 
+
     Raises:
         ValueError: If the fields do not fit together (see __post_init__).
     """
@@ -64,7 +65,7 @@ class BarkSegment:
 
     def __post_init__(self) -> None:
         """Check that the fields fit together and store each dog box as float32.
- 
+
         Raises:
             ValueError: If end_s is before start_s, frame_times_s or dog_boxes do not
                 match frames in length, a box is not shape (4,) or has no area,
@@ -112,27 +113,29 @@ class BarkSegment:
 
         if self.confidence is not None and not 0.0 <= self.confidence <= 1.0:
             raise ValueError(f"confidence {self.confidence} is not between 0 and 1")
-        
+
         checked_sections: list[SoundSection] = []
         for label, (section_start_s, section_end_s), score in self.sound_sections:
             if label not in SED_CLASSES:
                 raise ValueError(f"section label{label!r} is not one of {SED_CLASSES}")
-            
+
             inside = (
-                self.start_s - TIME_TOLERANCE_S 
+                self.start_s - TIME_TOLERANCE_S
                 <= section_start_s
                 < section_end_s
                 <= self.end_s + TIME_TOLERANCE_S
             )
             if not inside:
-                raise ValueError(f"sound section ({section_start_s}, {section_end_s}) is outside the segment")
+                raise ValueError(
+                    f"sound section ({section_start_s}, {section_end_s}) is outside the segment"
+                )
 
             if not 0.0 <= score <= 1.0:
                 raise ValueError(f"sound section score{score} is not between 0 and 1")
-            
+
             checked_sections.append(SoundSection(label, (section_start_s, section_end_s), score))
         self.sound_sections = checked_sections
-                
+
     @property
     def duration_s(self) -> float:
         """Length of the segment in seconds."""
@@ -217,7 +220,7 @@ class BarkSegment:
             for frame_index, frame_time_s in enumerate(self.frame_times_s):
                 box = self.dog_boxes[frame_index] if self.has_dog_boxes else None
                 if box is None:
-                    box_text = "no dog" if self.has_dog_boxes else""
+                    box_text = "no dog" if self.has_dog_boxes else ""
                 else:
                     x, y, w, h = box
                     box_text = f"dog at x={x:.0f} y={y:.0f} w={w:.0f} h={h:.0f}"

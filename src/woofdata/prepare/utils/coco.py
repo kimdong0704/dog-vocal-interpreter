@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from woofdata.utils_fileio import relative_data_path, write_json
+from woofdata.fileio import relative_data_path, write_json
 
 
 def new_coco(category_names: list[str], keypoint_names: list[str] | None = None) -> dict[str, Any]:

@@ -1,2 +1,4 @@
-- CLIP scene predictions and fusion handoff: [scene_fusion.md](scene_fusion.md)
+- Project overview, results and quick start: [README.md](../README.md)
+- Team setup, data download and preparation, model weights: [instructions.md](../instructions.md)
+- CLIP scene encoder, predictions and fusion handoff: [scene_fusion.md](scene_fusion.md)
 - Preserved YOLOE comparison: [notebook 41](../notebooks/41_scene_training.ipynb)

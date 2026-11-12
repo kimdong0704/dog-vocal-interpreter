@@ -48,6 +48,7 @@ def fusion_features(probs: dict[str, np.ndarray], present: dict[str, bool]) -> n
 
     return np.concatenate(parts)  # shape (18,)
 
+
 def head_to_categories(probs: np.ndarray, classes: list[str]) -> np.ndarray:
     columns: list[int] = []
     for category in CATEGORIES:
@@ -71,10 +72,10 @@ class FusionModel:
             present[name] = bool(outputs[name].present)
             if present[name]:
                 used.append(name)
-        
+
         if not used:
             return BranchOutput.missing()
-        
+
         head_probs = self.head.predict_proba(fusion_features(probs, present))
         fused = head_to_categories(head_probs, self.head.classes)
         return BranchOutput(

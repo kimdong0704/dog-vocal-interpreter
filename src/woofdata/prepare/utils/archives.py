@@ -9,7 +9,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 from typing import IO
 
-from woofdata.utils_fileio import to_posix_path
+from woofdata.fileio import to_posix_path
 
 
 def list_archive_members(archive_path: Path) -> dict[str, int]:

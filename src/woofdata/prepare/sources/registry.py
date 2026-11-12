@@ -19,9 +19,9 @@ from woofdata.prepare.sources import (
     esc50,
     playpant,
     roboflow,
+    self_labeled,
     stanford_dogs,
     stanfordextra,
-    self_labeled
 )
 
 # convert(raw_dir, out_dir) -> rows. out_dir is empty when the converter starts.
@@ -41,5 +41,5 @@ CONVERTERS: dict[str, Converter] = {
     "dogposecv": dogposecv.prepare,
     "rf_leash": roboflow.prepare_rf_leash,
     "rf_bowl": roboflow.prepare_rf_bowl,
-    "self_labeled": self_labeled.prepare
+    "self_labeled": self_labeled.prepare,
 }

@@ -17,6 +17,7 @@ from typing import Any
 import pyarrow.parquet as pq
 
 from woofdata.download.datasets import dataset_config
+from woofdata.fileio import relative_data_path
 from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.audio import convert_audio
 from woofdata.prepare.utils.label_files import (
@@ -26,7 +27,6 @@ from woofdata.prepare.utils.label_files import (
     write_sed_classes,
 )
 from woofdata.prepare.utils.windows import events_to_frame_targets, make_windows, save_frame_targets
-from woofdata.utils_fileio import relative_data_path
 from woofdecoder.taxonomy import SED_CLASSES
 
 # AudioSet strong-label event names. AudioSet "Pant" is a human breathing class, so it is

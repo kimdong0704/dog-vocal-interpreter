@@ -25,6 +25,7 @@ from typing import Any
 
 import pandas as pd
 
+from woofdata.console import use_utf8_output
 from woofdata.download.datasets import load_datasets, select_dataset
 from woofdata.download.reporter import folder_stats
 from woofdata.path import get_data_dir, load_data_dir_from_env_file
@@ -36,7 +37,6 @@ from woofdata.prepare.fingerprints import (
 from woofdata.prepare.manifest import build_manifest, processed_dir, write_source_rows
 from woofdata.prepare.sources.registry import CONVERTERS
 from woofdata.prepare.splits import check_splits, save_splits
-from woofdata.utils_console import use_utf8_output
 
 STATUS_DONE: str = "done"
 STATUS_SKIPPED: str = "skipped"

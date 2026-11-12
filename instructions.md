@@ -10,8 +10,9 @@ Follow the steps in order. For branches and pull requests, see [CONTRIBUTING.md]
 2. [Environment File](#2-environment-file) (Steps 10–11)
 3. [Data Download](#3-data-download) (Steps 12–14)
 4. [Data Preparation](#4-data-preparation) (Steps 15–18)
-5. [Daily Workflow](#5-daily-workflow)
-6. [Data Rules](#6-data-rules)
+5. [Model Weights](#5-model-weights) (Step 19)
+6. [Daily Workflow](#6-daily-workflow)
+7. [Data Rules](#7-data-rules)
 
 ---
 
@@ -72,12 +73,13 @@ If a browser window asks you to sign in to GitHub, sign in.
 
 | Extra | Adds | Needed for |
 |---|---|---|
-| `dev` | pytest, ruff, Jupyter kernel, nbstripout, matplotlib | Everyone |
-| `data` | soxr, pyarrow | Preparing the data (Section 4) |
-| `ml` | torch, transformers, librosa, scikit-learn | Training (`wooftrainer`) |
-| `app` | FastAPI, Uvicorn, Gradio | Running the app |
+| (core) | av, numpy, pillow, pyyaml, soxr | Always installed |
+| `dev` | ruff, Jupyter kernel, nbstripout, matplotlib, tqdm | Everyone |
+| `data` | dataset-downloader, pandas, pyarrow, soundfile | Downloading and preparing the data (Sections 3–4) |
+| `ml` | torch, torchaudio, torchvision, transformers, ultralytics, rfdetr, scikit-learn, scipy, pandas, matplotlib | The models (`woofdecoder` branches) and training (`wooftrainer`) |
+| `app` | FastAPI, Uvicorn, python-multipart | Running the app (also needs `ml`) |
 
-Add extras as you need them, e.g. `pip install -e ".[dev,data,ml]"`.
+Add extras as you need them; everything at once is `pip install -e ".[dev,data,ml,app]"`.
 
 ### Step 8: Configure notebooks and VS Code
 
@@ -90,11 +92,10 @@ In VS Code: `Ctrl+Shift+P` → **Python: Select Interpreter** → choose the one
 ### Step 9: Verify the setup
 
 ```bash
-pytest
 ruff check .
 ```
 
-**Check:** all tests pass and ruff reports no problems.
+**Check:** ruff reports no problems.
 
 ---
 
@@ -216,7 +217,29 @@ wraps the same rows (needs the `ml` extra).
 
 ---
 
-## 5. Daily Workflow
+## 5. Model Weights
+
+### Step 19: Get the weights that are not committed
+
+Only small trained files are committed: the audio heads (`models/audio/heads/`), the pose
+decoder (`models/pose/heads/pose_decoder_64.pt`) and the fusion head (`models/fusion/`).
+Get the rest once:
+
+| File | How to get it |
+|---|---|
+| `third_party/PretrainedSED/` (bark detector code) | `git clone https://github.com/fschmid56/PretrainedSED.git third_party/PretrainedSED` |
+| `models/pretrained_sed/frame_mn10_strong_1.pt` (bark detector, about 15 MB) | Downloaded automatically the first time the bark detector loads |
+| `third_party/unilm/beats/` (BEATs code) | `git clone --depth 1 --filter=blob:none --sparse https://github.com/microsoft/unilm.git third_party/unilm`, then `git -C third_party/unilm sparse-checkout set beats` |
+| `models/audio/beats/BEATs_iter3_plus_AS2M.pt` (audio encoder) | Download `BEATs_iter3_plus_AS2M.pt` from the checkpoint table in the [BEATs README](https://github.com/microsoft/unilm/tree/master/beats) and save it at this path |
+| `models/pose/yolo11m-pose_full/best.pt` (pose model) | Ask the team for the trained file, or retrain with `scripts/slurm/train_pose_encoder.sbatch` (notebook 30) and copy its `weights/best.pt` to this path |
+| CLIP `openai/clip-vit-base-patch32`, RF-DETR, Ultralytics base weights | Downloaded automatically on first use |
+
+**Check:** `uvicorn app.api.main:app` starts and serves
+<http://127.0.0.1:8000>.
+
+---
+
+## 6. Daily Workflow
 
 1. Activate the virtual environment (Step 6).
 2. Pull `main`, then create a branch for your task.
@@ -225,14 +248,13 @@ wraps the same rows (needs the `ml` extra).
 ```bash
    ruff format .
    ruff check .
-   pytest
 ```
 
 4. Open a pull request; one teammate reviews before merging.
 
 ---
 
-## 6. Data Rules
+## 7. Data Rules
 
 | Rule | Details |
 |---|---|

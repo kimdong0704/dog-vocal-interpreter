@@ -41,7 +41,9 @@ def class_weights(y_train: np.ndarray) -> np.ndarray:
 
 
 def make_loader(X: np.ndarray, y: np.ndarray, shuffle: bool = False) -> DataLoader:
-    dataset = TensorDataset(torch.from_numpy(X.astype(np.float32)), torch.from_numpy(y.astype(np.int64)))
+    dataset = TensorDataset(
+        torch.from_numpy(X.astype(np.float32)), torch.from_numpy(y.astype(np.int64))
+    )
     return DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=shuffle)
 
 
@@ -149,12 +151,21 @@ def sweep_learning_rates(
     for lr in lr_values:
         path = Path(checkpoint_dir) / f"decoder_lr{lr}.pt"
         history = train_pose_decoder(splits, path, lr=lr, num_epochs=num_epochs, verbose=verbose)
-        rows.append({"lr": lr, "best_val_macro_f1": history.best_f1, "best_epoch": history.best_epoch, "checkpoint": str(path)})
+        rows.append(
+            {
+                "lr": lr,
+                "best_val_macro_f1": history.best_f1,
+                "best_epoch": history.best_epoch,
+                "checkpoint": str(path),
+            }
+        )
         print(f"lr {lr}: best val macro-F1 {history.best_f1:.4f} (epoch {history.best_epoch})")
     return pd.DataFrame(rows).sort_values("best_val_macro_f1", ascending=False, ignore_index=True)
 
 
-def load_pose_decoder(checkpoint_path: str | Path, device: torch.device | None = None) -> PoseClassifier:
+def load_pose_decoder(
+    checkpoint_path: str | Path, device: torch.device | None = None
+) -> PoseClassifier:
     """Input size is read from the checkpoint, so it matches whatever the model was trained on."""
     device = device or pick_device()
     state_dict = torch.load(checkpoint_path, map_location=device)
@@ -167,7 +178,9 @@ def load_pose_decoder(checkpoint_path: str | Path, device: torch.device | None =
 def score_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
     return {
         "accuracy": float((y_true == y_pred).mean()),
-        "macro_f1": float(f1_score(y_true, y_pred, labels=range(NUM_CLASSES), average="macro", zero_division=0)),
+        "macro_f1": float(
+            f1_score(y_true, y_pred, labels=range(NUM_CLASSES), average="macro", zero_division=0)
+        ),
     }
 
 
@@ -203,7 +216,9 @@ def evaluate_pose_decoder(
 
     if verbose:
         print(f"{split} accuracy: {scores['accuracy']:.4f}, macro-F1: {scores['macro_f1']:.4f}")
-        print(f"baseline ({baseline['predicts']}) accuracy: {baseline['accuracy']:.4f}, macro-F1: {baseline['macro_f1']:.4f}")
+        print(
+            f"baseline ({baseline['predicts']}) accuracy: {baseline['accuracy']:.4f}, macro-F1: {baseline['macro_f1']:.4f}"
+        )
         print(report)
         print(confusion)
     return {**scores, "baseline": baseline, "report": report, "confusion": confusion}

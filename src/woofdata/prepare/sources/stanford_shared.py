@@ -15,9 +15,9 @@ from typing import Any
 
 import numpy as np
 
+from woofdata.fileio import read_csv
 from woofdata.prepare.manifest import processed_dir
 from woofdata.prepare.utils.hash_splits import split_from_hash
-from woofdata.utils_fileio import read_csv
 
 STANFORD_DOGS: str = "stanford_dogs"
 INDEX_FILENAME: str = "index.csv"

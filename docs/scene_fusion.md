@@ -4,6 +4,30 @@ The scene branch uses frozen `openai/clip-vit-base-patch32`. It runs on the full
 frames already sampled inside each `BarkSegment`, using the checkpoint's image
 preprocessor. No scene object detector or dog box is needed.
 
+## Scene encoder
+
+The frozen CLIP scene branch lives in `src/woofdecoder/scene/encoder.py`.
+`SceneBranch.from_config().predict(segment)` returns five probabilities in the same
+category order as audio, aggregated over the sampled frames inside the bark segment.
+The configuration selects experimental confidence-weighted mean logits;
+`branches.scene.aggregation` can also select mean logits or averaged frame
+probabilities. Scores are uncalibrated. Missing video returns `present=False`.
+
+The branch also exposes pooled image embeddings for fusion. Configuration is in
+`configs/pipeline.yaml`; first use downloads the pretrained CLIP checkpoint.
+Regenerate old object-detector caches after this replacement. The export command is in
+[Export and load](#export-and-load) below.
+
+Scene notebooks:
+- [40: CLIP image demonstration](../notebooks/40_scene_zero_shot.ipynb)
+- [41: preserved YOLOE experiment](../notebooks/41_scene_training.ipynb)
+- [42: segment aggregation comparison](../notebooks/42_scene_aggregation_comparison.ipynb)
+- [43: calibration comparison](../notebooks/43_scene_calibration_comparison.ipynb)
+
+The application pipeline currently runs audio only; the CLIP scene branch connects to fusion
+through the shared `BranchOutput` interface (the learned fusion head is fitted in
+[notebook 51](../notebooks/51_fusion_fitting.ipynb)).
+
 ## One prediction per segment
 
 For each frame, CLIP compares the image against five descriptions in `CATEGORIES`
@@ -80,10 +104,10 @@ from woofdecoder.scene import SceneBranch
 
 scene = SceneBranch.from_config()
 output = scene.predict(segment)
-print(output.probs)    # shape (5,), in CATEGORIES order
+print(output.probs)  # shape (5,), in CATEGORIES order
 print(output.present)  # False for missing video
 print(output.extras["frame_probs"])  # inspect disagreement across frames
-print(output.extras["frame_logits"]) # raw CLIP logits before temperature
+print(output.extras["frame_logits"])  # raw CLIP logits before temperature
 ```
 
 Missing video returns uniform placeholder scores and `present=False`; fusion must
@@ -101,7 +125,7 @@ Install the project's `ml` extra. First use downloads CLIP weights to the Huggin
 Face cache. Configuration is in `branches.scene` in `configs/pipeline.yaml`.
 
 ```powershell
-python -m wooftrainer.scene_export --manifest segments.json  # writes data/cache/scene/scene.npz
+python -m wooftrainer.scene_trainer.export --manifest segments.json  # writes data/cache/scene/scene.npz
 ```
 
 The manifest contains already-preprocessed frames. Paths are relative to its folder:
@@ -132,7 +156,7 @@ from wooftrainer.scene_trainer.embeddings import default_scene_cache, load_scene
 
 features, rows = load_scene_cache(default_scene_cache(), clip_ids=audio_segment_ids)
 scene_probs = np.stack(rows["probs"].to_numpy())  # (N, 5)
-scene_mask = rows["present"].to_numpy()          # (N,)
+scene_mask = rows["present"].to_numpy()  # (N,)
 schema_id = rows.attrs["scene_schema_id"]
 schema = rows.attrs["scene_schema"]
 ```

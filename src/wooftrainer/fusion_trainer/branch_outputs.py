@@ -7,10 +7,10 @@ from typing import Any, cast
 
 import pandas as pd
 
+from woofdata.fileio import read_csv
 from woofdata.path import data_path, load_data_dir_from_env_file
 from woofdata.prepare.manifest import processed_dir
 from woofdata.tasks import read_manifest
-from woofdata.utils_fileio import read_csv
 from woofdecoder.audio import AudioBranch
 from woofdecoder.base_branch import Branch, BranchOutput
 from woofdecoder.body.branch import BodyBranch
@@ -99,7 +99,7 @@ def check_or_write_info(path: Path, info: dict[str, Any]) -> None:
                 f"to rebuild.\n  cached: {existing}\n  now:    {info}"
             )
         return
-    
+
     path.write_text(json.dumps(info, indent=1, sort_keys=True), encoding="utf-8")
 
 
@@ -127,7 +127,7 @@ def segment_row(video: Any, segment: BarkSegment, outputs: dict[str, BranchOutpu
 def append_rows(path: Path, rows: list[dict]) -> None:
     if not rows:
         return
-    
+
     frame = pd.DataFrame(rows)
     frame.to_csv(path, mode="a", header=not path.is_file(), index=False, lineterminator="\n")
 
@@ -163,9 +163,7 @@ def cache_branch_outputs(device: str | None = None, verbose: bool = True) -> Pat
             continue
 
         started = time.perf_counter()
-        segments = build_segments(
-            video_path, detector, settings, source_id=video_id, verbose=False
-        )
+        segments = build_segments(video_path, detector, settings, source_id=video_id, verbose=False)
         kept = segments_in_span(segments, start_s, end_s)
         rows: list[dict] = []
 
@@ -190,7 +188,9 @@ def cache_branch_outputs(device: str | None = None, verbose: bool = True) -> Pat
             ],
         )
         if verbose:
-            print(f"{video.video_id} {video.category:<18} {len(kept):>3} segments  {seconds:>6.1f} s")
+            print(
+                f"{video.video_id} {video.category:<18} {len(kept):>3} segments  {seconds:>6.1f} s"
+            )
     return segments_path
 
 

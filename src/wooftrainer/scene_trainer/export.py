@@ -107,7 +107,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", required=True, type=Path, help="JSON segment manifest")
     parser.add_argument(
-        "--output", type=Path, help="Destination scene .npz cache; defaults to <data dir>/cache/scene/scene.npz"
+        "--output",
+        type=Path,
+        help="Destination scene .npz cache; defaults to <data dir>/cache/scene/scene.npz",
     )
     parser.add_argument("--device", help="Inference device, for example cpu or cuda")
     parser.add_argument("--config", type=Path, help="Pipeline YAML; defaults to the project config")

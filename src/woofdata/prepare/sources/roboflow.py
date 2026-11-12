@@ -25,11 +25,11 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from woofdata.download.datasets import dataset_config
+from woofdata.fileio import relative_data_path
 from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.coco import add_coco_annotation, add_coco_image, new_coco, write_coco
 from woofdata.prepare.utils.hash_splits import balanced_group_splits
 from woofdata.prepare.utils.label_files import write_labels
-from woofdata.utils_fileio import relative_data_path
 
 # Unified categories, numbered 1.. in this order in every output (1 dog ... 5 cat).
 UNIFIED_CATEGORIES: list[str] = ["dog", "person", "leash", "bowl", "cat"]

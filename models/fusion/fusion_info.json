@@ -1,0 +1,28 @@
+{
+ "scene_schema_id": "a34f2d595cac2170e3ffa477f900c0d7fd6d0a564cadc9d9400d265bdac360cc",
+ "branches": [
+  "audio",
+  "body",
+  "scene"
+ ],
+ "features": [
+  "audio:alert_aggressive",
+  "audio:playful_excited",
+  "audio:distressed_lonely",
+  "audio:attention_seeking",
+  "audio:other",
+  "body:alert_aggressive",
+  "body:playful_excited",
+  "body:distressed_lonely",
+  "body:attention_seeking",
+  "body:other",
+  "scene:alert_aggressive",
+  "scene:playful_excited",
+  "scene:distressed_lonely",
+  "scene:attention_seeking",
+  "scene:other",
+  "audio:present",
+  "body:present",
+  "scene:present"
+ ]
+}

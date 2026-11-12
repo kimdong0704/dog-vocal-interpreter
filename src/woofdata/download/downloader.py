@@ -20,9 +20,9 @@ from dataset_downloader import Downloader
 from dataset_downloader.auth import EnvFileError
 from dataset_downloader.models import DatasetResult
 
+from woofdata.console import use_utf8_output
 from woofdata.download.datasets import load_datasets, select_dataset
 from woofdata.path import ENV_FILE, get_data_dir, load_data_dir_from_env_file
-from woofdata.utils_console import use_utf8_output
 
 LOG_FILENAME: str = "download_log.csv"
 MANUAL_PROVIDER: str = "manual"
@@ -38,6 +38,7 @@ EXIT_INTERRUPTED: int = 130
 
 def is_manual(dataset: dict[str, Any]) -> bool:
     return dataset.get("provider") == MANUAL_PROVIDER
+
 
 def queue_dataset(downloader: Downloader, dataset: dict[str, Any]) -> None:
     """Queue one dataset into <raw>/<id>/ with Downloader.add or the named provider method."""
@@ -67,13 +68,13 @@ def run_downloads(selected: list[dict[str, Any]]) -> list[DatasetResult]:
         if is_manual(dataset):
             print(f"{dataset['id']}: added by hand, not downloaded (raw/{dataset['id']}/)")
             continue
-        
+
         queue_dataset(downloader, dataset)
         queued_count += 1
-        
+
     if queued_count == 0:
         return []
-    
+
     return downloader.run()
 
 

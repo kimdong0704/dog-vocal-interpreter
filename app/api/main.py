@@ -11,6 +11,7 @@ import shutil
 import tempfile
 from html import escape
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import HTMLResponse
@@ -101,10 +102,14 @@ def segment_card(number: int, result: SegmentResult) -> str:
 
     html = [
         '<div class="card">',
-        f'<div class="seg-head"><strong>Segment {number}</strong>'
-        f'<span class="time">{segment.start_s:.2f} – {segment.end_s:.2f} s</span></div>',
-        f'<div class="verdict">{escape(DISPLAY_NAMES[result.category])} '
-        f'<span class="pct">{result.probability * 100:.0f}%</span></div>',
+        (
+            f'<div class="seg-head"><strong>Segment {number}</strong>'
+            f'<span class="time">{segment.start_s:.2f} – {segment.end_s:.2f} s</span></div>'
+        ),
+        (
+            f'<div class="verdict">{escape(DISPLAY_NAMES[result.category])} '
+            f'<span class="pct">{result.probability * 100:.0f}%</span></div>'
+        ),
         "<h4>All categories</h4>",
     ]
     for name in sorted(CATEGORIES, key=probs.get, reverse=True):
@@ -156,7 +161,7 @@ def index() -> str:
 
 
 @app.post("/predict", response_class=HTMLResponse)
-def predict(clip: UploadFile = File(...)) -> str:
+def predict(clip: Annotated[UploadFile, File()]) -> str:
     suffix = Path(clip.filename or "").suffix
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / f"upload{suffix}"

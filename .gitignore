@@ -48,7 +48,6 @@ coverage.xml
 *.cover
 *.py.cover
 .hypothesis/
-.pytest_cache/
 cover/
 
 # Translations
@@ -223,37 +222,15 @@ docs/memory/
 
 
 # Project Rules
+# Order matters: the global patterns come first, and the data/ and models/ allow rules at
+# the end of this section, so no global pattern re-ignores a file in an allowed folder.
 
-# Data: never commit datasets, clips, or self-collected media
-data/*
-!data/.gitkeep
-# Shared, reproducible split definitions ARE committed
-!data/splits/
-# YouTube clip list (IDs + timestamps only, no media) IS committed
-!data/youtube/
-data/youtube/*
-!data/youtube/ids.csv
-
-# Trained models and downloaded weights
-models/*
-!models/.gitkeep
+# Model weights anywhere in the repo (large: BEATs, YOLO pose best.pt, the bark detector...)
 *.pt
 *.pth
 *.ckpt
 *.onnx
 *.safetensors
-
-# Body-branch weights ARE committed so BodyBranch works after a clone (agreed with Leo)
-!models/pose/
-models/pose/*
-!models/pose/decoder/
-models/pose/decoder/*
-!models/pose/decoder/pose_decoder_64.pt
-!models/pose/yolo11m-pose_full/
-models/pose/yolo11m-pose_full/*
-!models/pose/yolo11m-pose_full/weights/
-models/pose/yolo11m-pose_full/weights/*
-!models/pose/yolo11m-pose_full/weights/best.pt
 
 # Media and archives anywhere in the repo
 *.wav
@@ -266,9 +243,6 @@ models/pose/yolo11m-pose_full/weights/*
 *.tar
 *.tar.gz
 *.parquet
-
-# Smoke tests (small clips): exception
-!tests/fixtures/**
 
 # Experiment tracking
 wandb/
@@ -288,3 +262,16 @@ third_party/*
 
 # vs code settings
 .vscode/
+
+# Data: ignore everything except the shared split definitions in data/splits/
+data/*
+!data/splits/
+!data/splits/**
+
+# Models: ignore everything except any heads/ folder (at any depth) and models/fusion/.
+# models/** ignores every file; !models/**/ lets git look inside folders (the files in them
+# stay ignored); the last two rules allow the small trained heads and the fusion head.
+models/**
+!models/**/
+!models/**/heads/**
+!models/fusion/**

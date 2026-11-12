@@ -1,48 +1,48 @@
 """Self-labeled converter: the team's own labelled YouTube / phone videos.
- 
+
 Raw files (added by hand; configs/datasets.yaml "provider: manual"):
     raw/self_labeled/<collection>/labels.csv              one row per labelled span
     raw/self_labeled/<collection>/videos/<video_id>.mp4   the full video
 labels.csv columns: video_id, source_url, dog_id, start_s, end_s, category, labeller.
- 
+
 Every collection has a role (COLLECTION_ROLES), which sets its splits (SPLIT_SHARES):
     branch   fills a branch's missing data. Split train / val by dog (no test: branches are
              finally tested through fusion). Each span is cut into 10 s windows.
     fusion   the fusion task's own data. Split train / val / test by dog; one row per span.
              Kept out of every branch task by woofdata.tasks (collections are opt-in there).
- 
+
 A dog may appear in several collections; it then gets one split, the fusion collection's
 (see assign_splits), so no branch ever trains on a fusion val / test dog.
- 
+
 Audio is taken from the video with the app's own load_audio_16k and cut_audio, so training
 audio and app audio go through the same code. One 16 kHz WAV is written per span; window
 rows point into it with start_s / end_s.
 """
- 
+
 from __future__ import annotations
- 
+
 from collections import Counter
 from pathlib import Path
 from typing import Any
- 
+
 import numpy as np
 import pandas as pd
- 
+
+from woofdata.fileio import relative_data_path
 from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.audio import write_wav_16k
 from woofdata.prepare.utils.hash_splits import balanced_group_splits
 from woofdata.prepare.utils.label_files import write_labels
 from woofdata.prepare.utils.windows import DEFAULT_WINDOW_S, make_windows
-from woofdata.utils_fileio import relative_data_path
 from woofdecoder.preprocess.media import TARGET_SAMPLE_RATE, cut_audio, load_audio_16k
 from woofdecoder.taxonomy import CATEGORIES
- 
+
 SOURCE: str = "self_labeled"
 RAW_LABELS_FILENAME: str = "labels.csv"
 VIDEOS_DIRNAME: str = "videos"
 VIDEO_SUFFIX: str = ".mp4"
 AUDIO_DIRNAME: str = "audio"
- 
+
 BRANCH_ROLE: str = "branch"
 FUSION_ROLE: str = "fusion"
 # Every collection folder must be listed here, so a new one is added on purpose.
@@ -56,7 +56,7 @@ SPLIT_SHARES: dict[str, tuple[float, float]] = {
     FUSION_ROLE: (0.2, 0.2),
 }
 MIN_EVAL_DOGS: int = 4  # a val or test split with fewer dogs prints a warning
- 
+
 REQUIRED_COLUMNS: list[str] = [
     "video_id",
     "source_url",
@@ -66,12 +66,12 @@ REQUIRED_COLUMNS: list[str] = [
     "category",
     "labeller",
 ]
- 
+
 WINDOW_S: float = DEFAULT_WINDOW_S
 MIN_WINDOW_S: float = 1.0  # a leftover piece shorter than this is dropped
 # How much shorter than its label a cut span may be before end_s counts as past the video.
 SPAN_TOLERANCE_S: float = 0.1
- 
+
 SOURCE_LICENSE: str = "YouTube terms; team research use only"
 NOTES: str = "team-labelled online video; do not redistribute"
 LABEL_COLUMNS: list[str] = [
@@ -87,11 +87,11 @@ LABEL_COLUMNS: list[str] = [
     "window_index",
     "num_windows",
 ]
- 
- 
+
+
 def find_collections(raw_dir: Path) -> list[str]:
     """Return the collection folder names in raw_dir, sorted.
- 
+
     Raises:
         ValueError: If a folder is not in COLLECTION_ROLES.
     """
@@ -106,11 +106,11 @@ def find_collections(raw_dir: Path) -> list[str]:
             )
         collections.append(path.name)
     return collections
- 
- 
+
+
 def read_collection(raw_dir: Path, collection: str) -> list[dict[str, Any]]:
     """Return one dict per labels.csv row, with collection, role and float times added.
- 
+
     Raises:
         ValueError: If labels.csv is missing or lacks a required column.
     """
@@ -125,7 +125,7 @@ def read_collection(raw_dir: Path, collection: str) -> list[dict[str, Any]]:
             missing_columns.append(column)
     if missing_columns:
         raise ValueError(f"{labels_path} lacks columns {missing_columns}")
- 
+
     frame = frame.sort_values("video_id", kind="stable")
     spans: list[dict[str, Any]] = []
     for record in frame.to_dict("records"):
@@ -138,16 +138,16 @@ def read_collection(raw_dir: Path, collection: str) -> list[dict[str, Any]]:
         span["role"] = COLLECTION_ROLES[collection]
         spans.append(span)
     return spans
- 
- 
+
+
 def video_path_for(raw_dir: Path, span: dict[str, Any]) -> Path:
     """Return raw/self_labeled/<collection>/videos/<video_id>.mp4."""
     return raw_dir / span["collection"] / VIDEOS_DIRNAME / f"{span['video_id']}{VIDEO_SUFFIX}"
- 
- 
+
+
 def check_spans(raw_dir: Path, spans: list[dict[str, Any]]) -> None:
     """Raise ValueError listing every problem in the label rows (before any audio is read).
- 
+
     Checks: known category, end_s > start_s, a dog_id, the video file exists, and video_id
     unique within its collection's labels.csv.
     """
@@ -171,11 +171,11 @@ def check_spans(raw_dir: Path, spans: list[dict[str, Any]]) -> None:
 
     if problems:
         raise ValueError("self_labeled label problems:\n  " + "\n  ".join(problems))
- 
- 
+
+
 def assign_splits(spans: list[dict[str, Any]]) -> dict[str, str]:
     """Return {dog_id: split} for every dog, split within its collection by SPLIT_SHARES.
- 
+
     Each dog counts once (not per window or video), so one long video cannot fill a split
     by itself. The order is sha1 of the dog id, the same on every machine.
 
@@ -186,8 +186,9 @@ def assign_splits(spans: list[dict[str, Any]]) -> dict[str, str]:
     dogs_by_collection: dict[str, dict[str, int]] = {}
     for span in spans:
         dogs_by_collection.setdefault(span["collection"], {})[span["dog_id"]] = 1
- 
+
     split_by_dog: dict[str, str] = {}
+
     def fusion_last(collection: str) -> tuple[bool, str]:
         return (COLLECTION_ROLES[collection] == FUSION_ROLE, collection)
 
@@ -204,11 +205,11 @@ def assign_splits(spans: list[dict[str, Any]]) -> dict[str, str]:
                 )
         split_by_dog.update(collection_splits)
     return split_by_dog
- 
- 
+
+
 def window_bounds(span_s: float) -> list[tuple[float, float]]:
     """Return (start_s, end_s) windows of at most WINDOW_S inside a span of span_s seconds.
- 
+
     The last window ends at the span's end (no padding). A leftover piece shorter than
     MIN_WINDOW_S is dropped, unless it is the only window (a short clip is kept whole).
     """
@@ -219,11 +220,11 @@ def window_bounds(span_s: float) -> list[tuple[float, float]]:
             continue
         bounds.append((start_s, end_s))
     return bounds
- 
- 
+
+
 def extract_span(raw_dir: Path, span: dict[str, Any]) -> np.ndarray:
     """Return the span's audio, 16 kHz mono float32, shape (num_samples,).
- 
+
     Raises:
         ValueError: If the video has no audio track or end_s is past the end of the video.
     """
@@ -237,8 +238,8 @@ def extract_span(raw_dir: Path, span: dict[str, Any]) -> np.ndarray:
         video_s = len(audio) / TARGET_SAMPLE_RATE
         raise ValueError(f"{name}: end_s {span['end_s']} is past the video end ({video_s:.1f} s)")
     return span_audio
- 
- 
+
+
 def print_report(rows: list[ManifestRow], label_rows: list[dict[str, Any]]) -> None:
     """Print rows, videos and dogs per collection and split, and rows per category."""
     rows_by_group: Counter[str] = Counter()
@@ -257,11 +258,11 @@ def print_report(rows: list[ManifestRow], label_rows: list[dict[str, Any]]) -> N
             f"{len(dogs_by_group[group])} dogs"
         )
     print(f"  rows per category: {dict(sorted(categories.items()))}")
- 
- 
+
+
 def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
     """Convert every collection into span WAVs, labels.csv and manifest rows.
- 
+
     Raises:
         ValueError: On any label problem (checked before audio is read), an unknown
             collection folder, a video without audio, or a span past the video's end.
@@ -271,7 +272,7 @@ def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
         spans.extend(read_collection(raw_dir, collection))
     check_spans(raw_dir, spans)
     split_by_dog = assign_splits(spans)
- 
+
     rows: list[ManifestRow] = []
     label_rows: list[dict[str, Any]] = []
     for span in spans:
@@ -279,13 +280,13 @@ def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
         wav_path = out_dir / span["collection"] / AUDIO_DIRNAME / f"{span['video_id']}.wav"
         write_wav_16k(wav_path, span_audio)
         span_s = len(span_audio) / TARGET_SAMPLE_RATE
- 
+
         if span["role"] == FUSION_ROLE:
             bounds = [(0.0, round(span_s, 6))]  # fusion works on the whole labelled span
         else:
             bounds = window_bounds(span_s)
         split = split_by_dog[span["dog_id"]]
- 
+
         member_path = f"{span['collection']}/{span['video_id']}{VIDEO_SUFFIX}"
         for window_index, (start_s, end_s) in enumerate(bounds):
             clip_id = make_clip_id(SOURCE, member_path, span["start_s"] + start_s)
@@ -323,7 +324,7 @@ def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
                     "num_windows": len(bounds),
                 }
             )
- 
+
     write_labels(out_dir, label_rows, LABEL_COLUMNS)
     print_report(rows, label_rows)
     return rows

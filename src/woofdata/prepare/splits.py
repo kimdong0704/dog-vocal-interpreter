@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from woofdata.fileio import write_csv, write_json
 from woofdata.path import REPO_ROOT
-from woofdata.utils_fileio import write_csv, write_json
 
 # Committed to git (an exception in .gitignore), unlike everything else under data/.
 SPLITS_DIR: Path = REPO_ROOT / "data" / "splits"

@@ -15,10 +15,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from woofdata.fileio import read_csv
 from woofdata.path import load_data_dir_from_env_file
 from woofdata.prepare.manifest import MANIFEST_FILENAME, processed_dir
 from woofdata.prepare.utils.windows import DEFAULT_WINDOW_S
-from woofdata.utils_fileio import read_csv
 
 # Manifest split values that count as training for every task. train_only rows (labels
 # not trusted enough to report on) are trained on but never evaluated.
@@ -118,10 +118,10 @@ TASKS: dict[str, Task] = {
     "bark_detector": Task(("playpant", "audioset_strong_eval", "esc50"), BarkDetectorSample),
     # Act_Env trains (all train_only); PlayPanT (category playful_excited) is the val / test set.
     "audio_context": Task(
-        ("act_env", "playpant", "self_labeled"), 
-        AudioContextSample, 
-        CLIP_MAX_SECONDS, 
-        self_labeled_collection=("audio")
+        ("act_env", "playpant", "self_labeled"),
+        AudioContextSample,
+        CLIP_MAX_SECONDS,
+        self_labeled_collection=("audio"),
     ),
     "audio_emotion": Task(("emotional_canines",), AudioEmotionSample, CLIP_MAX_SECONDS),
     "pose": Task(("stanfordextra",), PoseSample),
@@ -167,9 +167,11 @@ def read_manifest() -> pd.DataFrame:
         raise FileNotFoundError(f"{manifest_path} is missing; run woofdata.prepare")
     return read_manifest_file(manifest_path)
 
+
 def clip_collection(clip_id: str) -> str:
     """Return the collection of a self_labeled clip id, "self_labeled/<collection>/<video>..."."""
     return clip_id.split("/")[1]
+
 
 def drop_unlisted_collections(rows: pd.DataFrame, collections: tuple[str, ...]) -> pd.DataFrame:
     """Drop self_labeled rows whose collection is not listed; other sources are all kept."""
@@ -180,6 +182,7 @@ def drop_unlisted_collections(rows: pd.DataFrame, collections: tuple[str, ...]) 
         else:
             keep.append(clip_collection(clip_id) in collections)
     return rows.loc[np.array(keep, dtype=bool)]
+
 
 def task_rows(
     task: str, split: str, eval_only: bool = False, sources: list[str] | None = None
@@ -214,9 +217,9 @@ def task_rows(
     keep = manifest["source"].isin(sources) & manifest["split"].isin(wanted_splits)
     if eval_only:
         keep = keep & manifest["eval_allowed"]
-    
+
     rows = manifest.loc[keep]
     if "self_labeled" in sources:
         rows = drop_unlisted_collections(rows, task_info.self_labeled_collection)
-    
+
     return rows.reset_index(drop=True)

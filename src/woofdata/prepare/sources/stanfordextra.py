@@ -19,6 +19,7 @@ from typing import Any
 import numpy as np
 
 from woofdata.download.datasets import dataset_config
+from woofdata.fileio import relative_data_path
 from woofdata.path import get_data_dir
 from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.sources.stanford_shared import (
@@ -29,7 +30,6 @@ from woofdata.prepare.sources.stanford_shared import (
 )
 from woofdata.prepare.utils.coco import add_coco_annotation, add_coco_image, new_coco, write_coco
 from woofdata.prepare.utils.label_files import write_labels
-from woofdata.utils_fileio import relative_data_path
 
 SOURCE: str = "stanfordextra"
 SPLITS: tuple[str, ...] = ("train", "val", "test")

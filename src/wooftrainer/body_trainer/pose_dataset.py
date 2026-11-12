@@ -87,7 +87,13 @@ def kaggle_rows(root: Path) -> list[list[str]]:
             continue
         for file in sorted(folder.iterdir()):
             rows.append(
-                [file.relative_to(root).as_posix(), "kaggle", folder.name, category, f"kaggle_{file.name}"]
+                [
+                    file.relative_to(root).as_posix(),
+                    "kaggle",
+                    folder.name,
+                    category,
+                    f"kaggle_{file.name}",
+                ]
             )
     return rows
 
@@ -104,19 +110,23 @@ def roboflow_rows(root: Path) -> list[list[str]]:
         with open(split_dir / "_annotations.coco.json", encoding="utf-8") as file:
             coco = json.load(file)
         category_names = {c["id"]: c["name"] for c in coco["categories"]}
-        image_labels = {a["image_id"]: category_names[a["category_id"]] for a in coco["annotations"]}
+        image_labels = {
+            a["image_id"]: category_names[a["category_id"]] for a in coco["annotations"]
+        }
         for image in coco["images"]:
             label = image_labels.get(image["id"])
             if label not in ROBOFLOW_MAP:
                 continue
             path = split_dir / image["file_name"]
-            rows.append([
-                path.relative_to(root).as_posix(),
-                "roboflow",
-                label,
-                ROBOFLOW_MAP[label],
-                f"roboflow_{roboflow_video_id(image['file_name'])}",
-            ])
+            rows.append(
+                [
+                    path.relative_to(root).as_posix(),
+                    "roboflow",
+                    label,
+                    ROBOFLOW_MAP[label],
+                    f"roboflow_{roboflow_video_id(image['file_name'])}",
+                ]
+            )
     return rows
 
 
@@ -179,7 +189,7 @@ def run_pose_encoder(
     device = device or str(pick_device())
     rows = []
     for start in range(0, len(paths), batch_size):
-        chunk = [str(p) for p in paths[start:start + batch_size]]
+        chunk = [str(p) for p in paths[start : start + batch_size]]
         for result in encoder.predict(source=chunk, device=device, verbose=False):
             parsed = parse_result(result)
             parsed["drop_reason"] = drop_reason(parsed["n_dogs"])
@@ -290,8 +300,8 @@ def split_by_group(
     n_train = int(train_fraction * len(unique_groups))
     n_val = int(val_fraction * len(unique_groups))
     train_mask = np.isin(groups, unique_groups[:n_train])
-    val_mask = np.isin(groups, unique_groups[n_train:n_train + n_val])
-    test_mask = np.isin(groups, unique_groups[n_train + n_val:])
+    val_mask = np.isin(groups, unique_groups[n_train : n_train + n_val])
+    test_mask = np.isin(groups, unique_groups[n_train + n_val :])
     sizes = {"train": train_mask.sum(), "val": val_mask.sum(), "test": test_mask.sum()}
     empty = [name for name, size in sizes.items() if size == 0]
     if empty:
@@ -300,7 +310,10 @@ def split_by_group(
             f"(train {train_fraction}, val {val_fraction}); need more groups."
         )
     return PoseSplits(
-        X[train_mask], y[train_mask],
-        X[val_mask], y[val_mask],
-        X[test_mask], y[test_mask],
+        X[train_mask],
+        y[train_mask],
+        X[val_mask],
+        y[val_mask],
+        X[test_mask],
+        y[test_mask],
     )

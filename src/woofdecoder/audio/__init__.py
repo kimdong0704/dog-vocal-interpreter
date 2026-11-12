@@ -1,5 +1,6 @@
 """Audio branch: bark segment -> embedding -> category probabilities."""
- 
+
+from woofdecoder.audio.branch import AudioBranch, load_heads, to_categories_order
 from woofdecoder.audio.encoder import (
     SAMPLE_RATE,
     AudioEncoder,
@@ -9,6 +10,7 @@ from woofdecoder.audio.encoder import (
     load_audio_encoder,
     split_into_chunks,
 )
+from woofdecoder.audio.features import LAYER_MEAN, Layer, check_layer, select_layer
 from woofdecoder.audio.head import (
     AROUSAL_HEAD_FILENAME,
     NUDGE_FILENAME,
@@ -18,15 +20,17 @@ from woofdecoder.audio.head import (
     LinearHead,
     emotion_input_names,
     emotion_inputs,
-    softmax
+    softmax,
 )
-from woofdecoder.audio.features import LAYER_MEAN, Layer, check_layer, select_layer
-from woofdecoder.audio.branch import AudioBranch, load_heads, to_categories_order
-
 
 __all__ = [
+    "AROUSAL_HEAD_FILENAME",
     "LAYER_MEAN",
+    "NUDGE_FILENAME",
     "SAMPLE_RATE",
+    "SITUATION_HEAD_FILENAME",
+    "VALENCE_HEAD_FILENAME",
+    "AudioBranch",
     "AudioEncoder",
     "EmotionNudge",
     "EncoderSettings",
@@ -34,18 +38,13 @@ __all__ = [
     "LinearHead",
     "check_audio",
     "check_layer",
+    "emotion_input_names",
+    "emotion_inputs",
     "encoder_from_config",
     "load_audio_encoder",
+    "load_heads",
     "select_layer",
     "softmax",
     "split_into_chunks",
-    "emotion_input_names",
-    "emotion_inputs",
-    "AROUSAL_HEAD_FILENAME",
-    "NUDGE_FILENAME",
-    "SITUATION_HEAD_FILENAME",
-    "VALENCE_HEAD_FILENAME",
-    "AudioBranch",
-    "load_heads",
-    "to_categories_order"
+    "to_categories_order",
 ]
