@@ -1,6 +1,7 @@
 "use strict";
-// Charts for the results pages: plain HTML/CSS, no libraries. Loaded after app.js and uses its
-// constants (CATEGORIES, DISPLAY, BRANCHES, PLAIN_BRANCH) and helpers (esc, pct, signed, argmax).
+// Charts for the results pages: plain HTML/CSS/SVG, no libraries. Loaded before app.js; the
+// functions use its constants (CATEGORIES, DISPLAY, SHORT, BRANCHES, PLAIN_BRANCH, ICONS) and helpers
+// (esc, pct, signed, argmax, span), so they may only be called once app.js has run.
 //
 // Colors (app.css): --c-<category> is categorical (identity of a situation), --seq is the
 // one-hue sequential ramp (probabilities), --div-pos / --div-neg the diverging pair (logit pushes).
@@ -65,31 +66,11 @@ function statTiles(items) {
     ${t.note ? `<div class="tile-note">${esc(t.note)}</div>` : ""}</div>`).join("")}</div>`;
 }
 
-function categoryLegend() {
-  return `<div class="legend">${CATEGORIES.map((c) =>
-    `<span><span class="swatch" style="background:${catColor(c)}"></span>${esc(DISPLAY[c])}</span>`).join("")}</div>`;
-}
-
 function seqLegend(low = "0%", high = "100%") {
   return `<div class="scale"><span>${low}</span><span class="grad seq"></span><span>${high}</span></div>`;
 }
 
-function divLegend(extent) {
-  return `<div class="scale"><span>−${extent.toFixed(1)} lowers</span><span class="grad div"></span><span>raises +${extent.toFixed(1)}</span></div>`;
-}
-
 const seqBackground = (v) => `color-mix(in oklab, var(--seq) ${Math.round(Math.max(0, Math.min(1, v)) * 100)}%, var(--card))`;
-
-function divBackground(v, extent) {
-  const share = Math.round(Math.min(1, Math.abs(v) / (extent || 1)) * 90);
-  return `color-mix(in oklab, var(${v >= 0 ? "--div-pos" : "--div-neg"}) ${share}%, var(--bar))`;
-}
-
-// Entropy of a probability vector as a share of the maximum (0 = certain, 1 = uniform).
-function uncertainty(probs) {
-  const h = -probs.reduce((sum, p) => (p > 0 ? sum + p * Math.log(p) : sum), 0);
-  return h / Math.log(probs.length);
-}
 
 function niceStep(span, target = 6) {
   const raw = span / target;
@@ -113,25 +94,87 @@ function timeAxis(start, end) {
 
 // ---------- clip overview (list page) ----------
 
-function clipStats(segs, duration) {
+// What the whole clip was mostly about: a ring of how many barks got each answer.
+function clipSummary(segs) {
   const found = segs.filter((s) => s.fused.present);
-  const vocal = segs.reduce((sum, s) => sum + (s.end_s - s.start_s), 0);
-  const meanTop = found.length ? found.reduce((sum, s) => sum + s.probability, 0) / found.length : null;
-  let agree = 0;
-  let opinions = 0;
-  found.forEach((s) => BRANCHES.forEach((b) => {
-    if (!s.branches[b].present) return;
-    opinions += 1;
-    if (argmax(s.branches[b].probs) === argmax(s.fused.probs)) agree += 1;
-  }));
-  const withBody = segs.filter((s) => s.branches.body.present).length;
-  return statTiles([
-    { label: "Barks found", value: String(segs.length), note: `${found.length} with an answer` },
-    { label: "Vocal time", value: `${vocal.toFixed(1)}<small> s</small>`, note: `${pct(vocal / duration, 0)} of the ${duration.toFixed(1)} s clip` },
-    { label: "Average certainty", value: meanTop == null ? "–" : pct(meanTop, 0), note: "chance of the top answer, averaged" },
-    { label: "Clues agree", value: opinions ? pct(agree / opinions, 0) : "–", note: `${agree} of ${opinions} clue opinions matched the answer` },
-    { label: "Body visible", value: `${withBody}<small> / ${segs.length}</small>`, note: "barks where the dog's pose could be read" },
-  ]);
+  const counts = CATEGORIES.map((c) => found.filter((s) => s.category === c).length);
+  const order = counts.map((n, i) => [n, i]).filter(([n]) => n > 0).sort((a, b) => b[0] - a[0]);
+  // Only name a "mostly" category when it clearly leads (no tie).
+  const lead = order.length && order[0][0] > (order[1] ? order[1][0] : 0) ? CATEGORIES[order[0][1]] : null;
+  const headline = lead
+    ? `<div class="headline" style="--c:${catColor(lead)}"><span class="kicker">Mostly</span><b><span class="dot"></span>${esc(DISPLAY[lead])}</b></div>`
+    : `<div class="headline"><span class="kicker">Mixed</span><b>No single situation</b></div>`;
+  if (!found.length) return `<div class="headline"><span class="kicker">Result</span><b>No answer</b></div>`;
+  const fracs = counts.map((n) => n / found.length);
+  return `${headline}
+    <div class="answer-viz">${donut(fracs, String(found.length), found.length === 1 ? "bark" : "barks",
+      (i) => `${DISPLAY[CATEGORIES[i]]}: ${counts[i]} of ${found.length} barks`)}
+    ${legendRows(order.map(([n, i]) => ({ c: CATEGORIES[i], value: `${n}`, top: CATEGORIES[i] === lead,
+      tip: `${DISPLAY[CATEGORIES[i]]}: ${n} of ${found.length} barks` })))}</div>`;
+}
+
+// One clickable card per bark: its answer and how sure the model is.
+function barkCard(seg, index) {
+  const time = `<div class="bc-top"><span>#${seg.number}</span><span class="num">${seg.start_s.toFixed(1)} s</span></div>`;
+  if (!seg.fused.present) {
+    return `<button type="button" class="bark-card" data-index="${index}" aria-label="Open bark ${seg.number}">
+      ${time}<span class="bc-pct muted">–</span><span class="bc-cat muted">No answer</span></button>`;
+  }
+  return `<button type="button" class="bark-card" style="--c:${catColor(seg.category)}" data-index="${index}"
+      aria-label="Open bark ${seg.number}: ${esc(DISPLAY[seg.category])} ${pct(seg.probability, 0)}">
+    ${time}<span class="bc-pct num">${pct(seg.probability, 0)}</span>
+    <span class="bc-cat"><span class="dot"></span>${esc(SHORT[seg.category])}</span></button>`;
+}
+
+// Ring chart of fractions (one arc per category); `center` and `word` sit in the middle.
+function donut(fracs, center, word, tipFor) {
+  const r = 62;
+  const C = 2 * Math.PI * r;
+  const best = argmax(fracs);
+  let start = 0;
+  const arcs = CATEGORIES.map((c, i) => {
+    const len = fracs[i] * C;
+    if (len <= 0) return "";
+    const gap = len > 6 && fracs[i] < 1 ? 2 : 0;
+    const arc = `<circle cx="80" cy="80" r="${r}" fill="none" stroke="${catColor(c)}" stroke-width="${i === best ? 22 : 16}"
+      stroke-dasharray="${Math.max(0, len - gap).toFixed(2)} ${C.toFixed(2)}" stroke-dashoffset="${(-start).toFixed(2)}"
+      data-tip="${esc(tipFor(i))}"/>`;
+    start += len;
+    return arc;
+  }).join("");
+  return `<svg class="donut" viewBox="0 0 160 160" role="img" aria-label="${esc(tipFor(best))}">
+    <circle cx="80" cy="80" r="${r}" fill="none" stroke="var(--bar)" stroke-width="16"/>
+    <g transform="rotate(-90 80 80)">${arcs}</g>
+    <text class="donut-num" x="80" y="88" text-anchor="middle">${esc(center)}</text>
+    <text class="donut-lab" x="80" y="110" text-anchor="middle">${esc(word)}</text></svg>`;
+}
+
+// rows: [{c (category), value (text), top, tip}]
+function legendRows(rows) {
+  return `<div class="plegend">${rows.map((r) => `<div class="pl-row${r.top ? " top" : ""}" data-tip="${esc(r.tip)}">
+    <span class="dot" style="--c:${catColor(r.c)}"></span><span>${esc(SHORT[r.c])}</span><span class="num">${r.value}</span></div>`).join("")}</div>`;
+}
+
+// Every category with its chance, highest first.
+function probLegend(probs) {
+  const best = argmax(probs);
+  return legendRows(probs.map((p, i) => [p, i]).sort((a, b) => b[0] - a[0]).map(([p, i]) =>
+    ({ c: CATEGORIES[i], value: pct(p, 0), top: i === best, tip: `${DISPLAY[CATEGORIES[i]]}: ${pct(p)}` })));
+}
+
+// Five columns (one per category) for a clue's opinion; the top one is labelled.
+function miniColumns(probs, who) {
+  const best = argmax(probs);
+  return `<div class="minicols">${CATEGORIES.map((c, i) => `<div class="minicol${i === best ? "" : " dim"}"
+      data-tip="${esc(`${who} · ${DISPLAY[c]}: ${pct(probs[i])}`)}">
+      <i style="height:${Math.max(3, probs[i] * 100).toFixed(1)}%;background:${catColor(c)}"></i><span>${ABBR[c]}</span></div>`).join("")}</div>`;
+}
+
+// How much the combiner listened to a clue for this answer (logit, relative to its average push).
+function effectBadge(value) {
+  const [cls, word] = value > 0.25 ? ["pos", "▲ Pushed toward the answer"]
+    : value >= -0.25 ? ["", "● Little effect"] : ["neg", "▼ Pushed away from it"];
+  return `<div class="effect ${cls}" data-tip="${esc(`Push in the combiner: ${signed(value)} (logit)`)}">${word}</div>`;
 }
 
 // opts.focus: index of the bark to highlight (the others are dimmed).
@@ -144,75 +187,10 @@ function clipTimeline(segs, duration, opts = {}) {
     const dim = opts.focus != null && opts.focus !== i ? " dim" : "";
     const color = s.fused.present ? catColor(s.category) : "var(--muted)";
     return `<button type="button" class="tl-bark${dim}" data-index="${i}" data-tip="${esc(text)}" aria-label="${esc(text)}"
-      style="left:${left}%;width:max(5px, ${width}%);background:${color}"></button>`;
+      style="left:${left}%;width:max(6px, ${width}%);background:${color}"></button>`;
   }).join("");
   return `<div class="timeline" data-duration="${duration}"><div class="tl-lane">${blocks}<div class="playhead"></div></div>
     ${timeAxis(0, duration)}</div>`;
-}
-
-function situationCounts(segs) {
-  const found = segs.filter((s) => s.fused.present);
-  const counts = CATEGORIES.map((c) => found.filter((s) => s.category === c).length);
-  const means = CATEGORIES.map((_, i) => (found.length ? found.reduce((sum, s) => sum + s.fused.probs[i], 0) / found.length : 0));
-  const maxCount = Math.max(1, ...counts);
-  const rows = (values, scale, fmt, tipText) => CATEGORIES.map((c, i) => `<div class="row" data-tip="${esc(tipText(c, i))}">
-      <span>${esc(DISPLAY[c])}</span>
-      <div class="track"><div class="fill" style="width:${(values[i] / scale) * 100}%;background:${catColor(c)}"></div></div>
-      <span class="num">${fmt(values[i])}</span></div>`).join("");
-  return `<div class="split">
-    <div><h4>Top answer, per bark</h4>
-      ${rows(counts, maxCount, String, (c, i) => `${DISPLAY[c]}: top answer for ${counts[i]} of ${found.length} barks`)}</div>
-    <div><h4>Average chance over all barks</h4>
-      ${rows(means, 1, (v) => pct(v, 0), (c, i) => `${DISPLAY[c]}: ${pct(means[i])} on average`)}</div>
-  </div>`;
-}
-
-// 100% stacked column per bark: the full answer, not just the top category.
-function mixColumns(segs) {
-  const columns = segs.map((s, i) => {
-    const label = `<span class="mix-x">#${s.number}</span>`;
-    if (!s.fused.present) {
-      return `<button type="button" class="mix-col empty" data-index="${i}" data-tip="Bark #${s.number}: no answer">
-        <span class="mix-bar"></span>${label}</button>`;
-    }
-    const parts = CATEGORIES.map((c, j) => {
-      const p = s.fused.probs[j];
-      if (p < 0.005) return "";
-      return `<span class="mix-seg" style="flex:${p} 1 0;background:${catColor(c)}"
-        data-tip="${esc(`Bark #${s.number} · ${s.start_s.toFixed(2)} s\n${DISPLAY[c]}: ${pct(p)}`)}"></span>`;
-    }).join("");
-    return `<button type="button" class="mix-col" data-index="${i}" aria-label="Open bark ${s.number}">
-      <span class="mix-bar">${parts}</span>${label}</button>`;
-  }).join("");
-  return `${categoryLegend()}
-    <div class="mix-wrap"><div class="mix-y"><span style="top:0">100%</span><span style="top:50%">50%</span><span style="top:100%">0%</span></div>
-      <div class="mix">${columns}</div></div>`;
-}
-
-// Rows: each clue and the answer; columns: barks. Cell = that row's top situation (letter + color),
-// ✓ when a clue agrees with the answer.
-function agreementMatrix(segs) {
-  const rows = [...BRANCHES.map((b) => [b, PLAIN_BRANCH[b]]), ["fused", "Answer"]];
-  const head = `<tr><th></th>${segs.map((s) => `<th>#${s.number}</th>`).join("")}<th>Agrees</th></tr>`;
-  const body = rows.map(([key, label]) => {
-    let agree = 0;
-    let used = 0;
-    const cells = segs.map((s) => {
-      const out = key === "fused" ? s.fused : s.branches[key];
-      if (!out.present) return `<td data-tip="${esc(`Bark #${s.number} · ${label}: not used`)}"><span class="dotcell none">–</span></td>`;
-      const top = argmax(out.probs);
-      const category = CATEGORIES[top];
-      const matches = key !== "fused" && s.fused.present && top === argmax(s.fused.probs);
-      if (key !== "fused") { used += 1; if (matches) agree += 1; }
-      const text = `Bark #${s.number} · ${label}\n${DISPLAY[category]} ${pct(out.probs[top], 0)}`
-        + (key === "fused" ? "" : matches ? "\nSame as the answer" : "\nDiffers from the answer");
-      return `<td data-tip="${esc(text)}"><span class="dotcell c-${category}" style="background:${catColor(category)}">${ABBR[category]}</span>${matches ? '<span class="agree">✓</span>' : ""}</td>`;
-    }).join("");
-    const total = key === "fused" ? "" : used ? `${agree}/${used}` : "–";
-    return `<tr${key === "fused" ? ' class="answer-row"' : ""}><th class="rowh">${esc(label)}</th>${cells}<td class="num">${total}</td></tr>`;
-  }).join("");
-  const key = CATEGORIES.map((c) => `<span><span class="dotcell c-${c}" style="background:${catColor(c)}">${ABBR[c]}</span> ${esc(DISPLAY[c])}</span>`).join("");
-  return `<div class="legend">${key}</div><div class="scroll"><table class="matrix agree-m">${head}${body}</table></div>`;
 }
 
 // ---------- heatmaps (detail page) ----------
@@ -228,26 +206,6 @@ function probHeatmap(rows, { highlightMax = true } = {}) {
         data-tip="${esc(`${r.tipLabel || ""}${DISPLAY[CATEGORIES[i]]}: ${pct(v)}`)}">${pct(v, 0)}</td>`).join("")}</tr>`;
   }).join("");
   return `<div class="scroll"><table class="matrix">${head}${body}</table></div>${seqLegend()}`;
-}
-
-function opinionMatrix(seg) {
-  const rows = BRANCHES.map((b) => ({
-    label: `${ICONS[b]} ${esc(PLAIN_BRANCH[b])}`,
-    tipLabel: `${PLAIN_BRANCH[b]} · `,
-    values: seg.branches[b].present ? seg.branches[b].probs : null,
-    off: `not used: ${notUsedReason(seg, b)}`,
-  }));
-  rows.push({
-    label: "Combined answer",
-    tipLabel: "Combined · ",
-    values: seg.fused.present ? seg.fused.probs : null,
-    off: "no answer",
-    strong: true,
-  });
-  return `<div class="card"><h3>Every clue's opinion, side by side</h3>
-    <p class="lead">Each row adds up to 100%. Darker = more likely; the outlined cell is that row's top pick.
-      The combined answer is not a simple average: the combiner trusts some clues more.</p>
-    ${probHeatmap(rows)}</div>`;
 }
 
 function sceneFrameHeatmap(seg) {
@@ -266,17 +224,7 @@ function sceneFrameHeatmap(seg) {
     };
   });
   rows.push({ label: "Combined", tipLabel: "Combined · ", values: seg.branches.scene.probs, strong: true });
-  return `<h4>Every frame's match (frames × situations)</h4>${probHeatmap(rows)}`;
-}
-
-function contributionMatrix(f) {
-  const rows = [["Bias", f.bias], ...BRANCHES.map((b) => [PLAIN_BRANCH[b], f.contributions[b]]), ["Total (logit)", f.logits]];
-  const extent = Math.max(1e-6, ...rows.flatMap(([, values]) => values.map(Math.abs)));
-  const head = `<tr><th></th>${CATEGORIES.map((c) => `<th>${esc(DISPLAY[c])}</th>`).join("")}</tr>`;
-  const body = rows.map(([label, values], r) => `<tr${r === rows.length - 1 ? ' class="answer-row"' : ""}><th class="rowh">${esc(label)}</th>
-    ${values.map((v, i) => `<td class="cell${Math.abs(v) / extent > 0.6 ? " hi" : ""}" style="background:${divBackground(v, extent)}"
-      data-tip="${esc(`${label} → ${DISPLAY[CATEGORIES[i]]}: ${signed(v, 3)}`)}">${signed(v)}</td>`).join("")}</tr>`).join("");
-  return `<div class="scroll"><table class="matrix">${head}${body}</table></div>${divLegend(extent)}`;
+  return `<h4>Per frame</h4>${probHeatmap(rows)}`;
 }
 
 // ---------- small diverging bars ----------

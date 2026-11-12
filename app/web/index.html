@@ -7,61 +7,101 @@
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-<main>
-  <h1>Woof<span>Decoder</span></h1>
-  <p class="sub">Upload a clip of a dog. The app finds every bark, growl or whine and makes a best
-    guess at the situation behind it, using three clues: how it <strong>sounds</strong>, the dog's
-    <strong>body language</strong>, and the <strong>surroundings</strong>.</p>
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="logo" href="#/">Woof<span>Decoder</span></a>
+    <nav class="nav">
+      <a href="#/" data-nav="home">Analyze</a>
+      <a href="#/how" data-nav="how">How it works</a>
+    </nav>
+  </div>
+</header>
 
-  <div class="card">
-    <form id="upload">
-      <input type="file" id="clip" name="clip" accept="video/*,audio/*" required>
-      <button type="submit" id="analyze">Analyze</button>
-    </form>
-    <div id="progress" class="progress" hidden>
-      <div class="progress-label"><span id="stage">Uploading…</span><span id="pct" class="num"></span></div>
-      <div class="track big"><div class="fill" id="bar"></div></div>
+<main>
+  <!-- 1. upload -->
+  <section id="view-upload" class="view">
+    <div class="hero">
+      <h1>What is your dog barking about?</h1>
+      <p class="sub">One clip in. One guess per bark out.</p>
+      <div class="clue-chips" id="clue-chips"></div>
+    </div>
+
+    <label class="drop-zone" id="drop">
+      <span class="drop-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></span>
+      <span class="drop-title">Drop a video or audio clip</span>
+      <span class="drop-sub">or click to choose · mp4, mov, wav, mp3 · up to 200 MB</span>
+      <input type="file" id="clip" class="sr-only" accept="video/*,audio/*">
+    </label>
+
+    <div id="progress" class="card progress" hidden>
+      <div class="ring">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring-track" cx="60" cy="60" r="50"/>
+          <circle class="ring-fill" id="ring-fill" cx="60" cy="60" r="50" pathLength="100"
+                  stroke-dasharray="100" stroke-dashoffset="100" transform="rotate(-90 60 60)"/>
+        </svg>
+        <span class="ring-num num" id="pct">0%</span>
+      </div>
+      <div>
+        <div class="progress-stage" id="stage" aria-live="polite">Uploading…</div>
+        <div class="progress-file" id="progress-file"></div>
+      </div>
+      <div id="live-diagram" class="diagram"></div>
     </div>
     <p id="error" class="error" role="alert" hidden></p>
-  </div>
+  </section>
 
-  <details class="card how" id="how" open>
-    <summary><h2>How it works</h2><span class="note">Tap any box to see what it does</span></summary>
-    <div id="how-diagram" class="diagram"></div>
-    <h4>The five situations</h4>
-    <dl class="glossary" id="glossary"></dl>
-  </details>
+  <!-- 2. results (list + one bark) -->
+  <section id="view-results" class="view" hidden>
+    <div class="bar-head" id="list-nav">
+      <div class="min0"><div class="kicker">Clip</div><h2 id="clip-name"></h2></div>
+      <button type="button" class="ghost" id="new-clip">+ New clip</button>
+    </div>
+    <div class="bar-head" id="detail-nav" hidden>
+      <button type="button" class="ghost" id="back">← All barks</button>
+      <span class="pager">
+        <button type="button" class="ghost icon-btn" id="prev" aria-label="Previous bark">‹</button>
+        <span id="detail-pos" class="num pos-label"></span>
+        <button type="button" class="ghost icon-btn" id="next" aria-label="Next bark">›</button>
+      </span>
+    </div>
 
-  <section id="results" hidden>
-    <div class="card player"><video id="player" controls preload="metadata" playsinline></video></div>
+    <div class="stage">
+      <div class="card player" id="player-card">
+        <video id="player" controls preload="metadata" playsinline></video>
+        <div id="timeline-host"></div>
+      </div>
+      <aside class="card side" id="side"></aside>
+    </div>
 
     <div id="list-view">
-      <p class="summary" id="summary"></p>
-      <div id="overview"></div>
-      <div id="segments" class="seg-list"></div>
-      <div id="clip-charts"></div>
+      <h3 class="section-title"><span>Tap a bark to see why</span></h3>
+      <div id="bark-grid" class="bark-grid"></div>
     </div>
 
     <div id="detail-view" hidden>
-      <nav class="detail-nav">
-        <button type="button" class="ghost" id="back">← All barks</button>
-        <span id="detail-pos" class="time"></span>
-        <span class="pager">
-          <button type="button" class="ghost" id="prev" aria-label="Previous bark">‹ Prev</button>
-          <button type="button" class="ghost" id="next" aria-label="Next bark">Next ›</button>
-        </span>
-      </nav>
       <div id="detail"></div>
     </div>
   </section>
 
+  <!-- 3. how it works -->
+  <section id="view-how" class="view" hidden>
+    <div class="page-head">
+      <h1>How it works</h1>
+      <p class="sub">Tap any box for details.</p>
+    </div>
+    <div class="card"><div id="how-diagram" class="diagram"></div></div>
+    <div class="numbers" id="numbers"></div>
+    <h3 class="section-title"><span>The 5 situations</span></h3>
+    <div class="sits" id="situations"></div>
+  </section>
+
   <footer>
-    WoofDecoder estimates the likely <em>context</em> of barking from patterns in sound and video.
-    It does <strong>not</strong> translate dog language. Some models and datasets are licensed for
-    non-commercial use only; this project is for academic, non-commercial use.
+    Estimates the likely <em>context</em> of a bark from sound and video. It does <strong>not</strong>
+    translate dog language. Academic, non-commercial use only.
   </footer>
 </main>
-<script src="/static/app.js"></script>
 <script src="/static/charts.js"></script>
+<script src="/static/app.js"></script>
 </body>
 </html>

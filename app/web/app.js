@@ -1,4 +1,6 @@
 "use strict";
+// Page logic: upload + progress, views (upload / results / bark detail / how it works), model diagram.
+// Loaded after charts.js; the chart builders there are only called from functions here.
 
 // Category order of every probability array (woofdecoder.taxonomy.CATEGORIES).
 const CATEGORIES = ["alert_aggressive", "playful_excited", "distressed_lonely", "attention_seeking", "other"];
@@ -16,8 +18,15 @@ const SHORT = {
   attention_seeking: "Wants attention",
   other: "Other",
 };
-// What each situation means, in everyday words (see woofdecoder.taxonomy).
+// One short line per situation; the longer text is shown as a tooltip.
 const MEANING = {
+  alert_aggressive: "Warning or guarding",
+  playful_excited: "Play, greeting or excitement",
+  distressed_lonely: "Anxious, alone or scared",
+  attention_seeking: "Asking for food, a walk, a toy…",
+  other: "Vocal, but none of the above",
+};
+const MEANING_LONG = {
   alert_aggressive: "The dog is warning or guarding: for example at a stranger, another animal or a noise outside.",
   playful_excited: "The dog is having fun or is excited: during play, greeting someone, or expecting something good.",
   distressed_lonely: "The dog seems upset or anxious: for example when left alone, frightened or uncomfortable.",
@@ -25,7 +34,7 @@ const MEANING = {
   other: "The dog is vocalizing, but not in one of the four situations above (for example while resting or during a bath). This does not mean the model is unsure.",
 };
 const BRANCHES = ["audio", "body", "scene"];
-const PLAIN_BRANCH = { audio: "Sound", body: "Body language", scene: "Surroundings" };
+const PLAIN_BRANCH = { audio: "Sound", body: "Body", scene: "Scene" };
 const CLUE_HINT = {
   audio: "How the bark sounds: pitch, harshness, length.",
   body: "Posture: tail, ears and head position.",
@@ -33,14 +42,13 @@ const CLUE_HINT = {
 };
 const POLL_MS = 1000;
 
-// One plain sentence per step, from the README model-structure section.
+// One sentence per step, from the README model-structure section (shown under "Model internals").
 const LEADS = {
-  preprocessing: "The audio is converted to 16 kHz, a pretrained bark detector (PretrainedSED frame_mn10) finds each dog sound, and frames are sampled from the video inside that segment.",
-  audio: "Frozen BEATs turns the sound into an embedding, and linear heads score the situation, arousal and valence.",
-  body: "A fine-tuned YOLO11m-pose finds the dog's keypoints in each frame, and a small pose decoder (MLP) turns them into category probabilities.",
-  scene: "Frozen CLIP ViT-B/32 compares each frame with one text prompt per category (zero-shot), and the scores are combined over the frames.",
-  fusion: "A learned logistic-regression head combines the 15 branch probabilities and 3 branch-present flags, with a fitted temperature.",
-  result: "The fused probabilities over the 5 categories for this vocalization.",
+  preprocessing: "Audio → 16 kHz; a pretrained bark detector (PretrainedSED frame_mn10) finds each dog sound; frames are sampled inside that segment.",
+  audio: "Frozen BEATs embedding → linear heads for situation, arousal and valence.",
+  body: "Fine-tuned YOLO11m-pose keypoints → pose decoder (MLP) → category probabilities.",
+  scene: "Frozen CLIP ViT-B/32, zero-shot against one text prompt per category, combined over frames.",
+  fusion: "Logistic-regression head on 15 branch probabilities + 3 present flags, with a fitted temperature.",
 };
 
 const ICONS = {
@@ -53,11 +61,15 @@ const $ = (id) => document.getElementById(id);
 const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const pct = (p, digits = 1) => `${(p * 100).toFixed(digits)}%`;
 const secs = (s) => `${Number(s).toFixed(2)} s`;
+const span = (s) => `${s.start_s.toFixed(2)}–${s.end_s.toFixed(2)} s`;
 const signed = (x, digits = 2) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(digits)}`;
 const argmax = (values) => values.reduce((best, v, i) => (v > values[best] ? i : best), 0);
+const info = (text) => `<span class="info" tabindex="0" data-tip="${esc(text)}" aria-label="${esc(text)}">i</span>`;
 
 let job = null;
+let clip = null;       // finished job status (filename, results) or null
 let segments = [];
+let busy = false;
 
 // ---------- upload + progress ----------
 
@@ -66,19 +78,19 @@ function showError(message) {
   $("error").hidden = !message;
 }
 
-function setBusy(busy) {
-  $("analyze").disabled = busy;
-  $("analyze").textContent = busy ? "Analyzing…" : "Analyze";
-  $("progress").hidden = !busy;
+function setBusy(on) {
+  busy = on;
+  $("drop").hidden = on;
+  $("progress").hidden = !on;
+  if (on) redrawDiagrams();
 }
 
 function stageText(s) {
-  if (s.status === "queued") return "Waiting for the previous clip to finish…";
-  if (s.stage === "extracting audio/frames") {
-    return s.total > 1 ? `Extracting frames for segment ${s.done + 1}/${s.total}…` : "Extracting audio…";
-  }
-  if (s.stage === "detecting barks") return "Detecting barks…";
-  if (BRANCHES.includes(s.stage) || s.stage === "fusion") return `Segment ${s.done + 1}/${s.total}: ${s.stage}…`;
+  if (s.status === "queued") return "Waiting in line…";
+  if (s.stage === "extracting audio/frames") return s.total > 1 ? `Frames · bark ${s.done + 1} / ${s.total}` : "Extracting audio";
+  if (s.stage === "detecting barks") return "Finding barks";
+  if (BRANCHES.includes(s.stage)) return `Bark ${s.done + 1} / ${s.total} · ${PLAIN_BRANCH[s.stage].toLowerCase()}`;
+  if (s.stage === "fusion") return `Bark ${s.done + 1} / ${s.total} · combining`;
   return "Working…";
 }
 
@@ -92,9 +104,10 @@ function stageFraction(s) {
 }
 
 function setProgress(text, fraction) {
+  const value = Math.min(100, Math.round(fraction * 100));
   $("stage").textContent = text;
-  $("pct").textContent = `${Math.round(fraction * 100)}%`;
-  $("bar").style.width = `${Math.min(100, fraction * 100)}%`;
+  $("pct").textContent = `${value}%`;
+  $("ring-fill").style.strokeDashoffset = String(100 - value);
 }
 
 async function readError(response) {
@@ -105,17 +118,16 @@ async function readError(response) {
   return `The server answered ${response.status} ${response.statusText}.`;
 }
 
-$("upload").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const file = $("clip").files[0];
-  if (!file) return;
+async function startUpload(file) {
+  if (!file || busy) return;
   showError("");
-  $("results").hidden = true;
+  clip = null;
   segments = [];
-  history.replaceState(null, "", location.pathname + location.search);
-  $("how").open = true;
-  howDiagram.setActive(["input"]);
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  route();
+  $("progress-file").textContent = file.name;
   setBusy(true);
+  liveDiagram.setActive(["input"]);
   setProgress("Uploading…", 0);
   try {
     const form = new FormData();
@@ -125,11 +137,21 @@ $("upload").addEventListener("submit", async (event) => {
     job = (await response.json()).job_id;
     poll();
   } catch (error) {
-    setBusy(false);
-    howDiagram.setActive(null);
-    showError(error instanceof TypeError ? "Could not reach the server. Is uvicorn still running?" : error.message);
+    failed(error instanceof TypeError ? "Could not reach the server. Is uvicorn still running?" : error.message);
   }
-});
+}
+
+function failed(message) {
+  setBusy(false);
+  liveDiagram.setActive(null);
+  $("clip").value = "";
+  showError(message);
+}
+
+$("clip").addEventListener("change", () => startUpload($("clip").files[0]));
+["dragenter", "dragover"].forEach((type) => $("drop").addEventListener(type, (e) => { e.preventDefault(); $("drop").classList.add("over"); }));
+["dragleave", "drop"].forEach((type) => $("drop").addEventListener(type, () => $("drop").classList.remove("over")));
+$("drop").addEventListener("drop", (e) => { e.preventDefault(); startUpload(e.dataTransfer.files[0]); });
 
 async function poll() {
   try {
@@ -140,112 +162,98 @@ async function poll() {
     if (status.status === "done") {
       setProgress("Done", 1);
       setBusy(false);
+      liveDiagram.setActive(null);
+      $("clip").value = "";
       showResults(status);
       return;
     }
     setProgress(stageText(status), stageFraction(status));
-    howDiagram.setActive(activeIds(status));
+    liveDiagram.setActive(activeIds(status));
     setTimeout(poll, POLL_MS);
   } catch (error) {
-    setBusy(false);
-    howDiagram.setActive(null);
-    showError(error instanceof TypeError ? "Lost connection to the server." : error.message);
+    failed(error instanceof TypeError ? "Lost connection to the server." : error.message);
   }
 }
 
-// ---------- shared pieces ----------
+// ---------- tabs ----------
 
-function bar(label, value, top = false, color = null) {
-  const style = color ? `background:${color}` : "";
-  return `<div class="row${top ? " top" : ""}"><span>${esc(label)}</span>
-    <div class="track"><div class="fill" style="width:${(value * 100).toFixed(1)}%;${style}"></div></div>
-    <span class="num">${pct(value)}</span></div>`;
+const tabMemory = {};  // tabset name -> last chosen tab, so it survives bark-to-bark navigation
+
+// tabs: [{key, label, html}]
+function tabset(name, tabs) {
+  const active = tabs.some((t) => t.key === tabMemory[name]) ? tabMemory[name] : tabs[0].key;
+  return `<div class="tabset" data-tabset="${name}">
+    <div class="tabs" role="tablist">${tabs.map((t) => `<button type="button" role="tab" class="tab${t.key === active ? " on" : ""}"
+      data-tab="${t.key}" aria-selected="${t.key === active}">${t.label}</button>`).join("")}</div>
+    ${tabs.map((t) => `<div class="tab-panel" role="tabpanel" data-panel="${t.key}"${t.key === active ? "" : " hidden"}>${t.html}</div>`).join("")}
+  </div>`;
 }
 
-function categoryBars(probs) {
-  const best = argmax(probs);
-  return CATEGORIES.map((c, i) => bar(DISPLAY[c], probs[i], i === best)).join("");
-}
-
-function namedBars(values) {
-  const names = Object.keys(values);
-  const best = names.reduce((a, b) => (values[b] > values[a] ? b : a), names[0]);
-  return names.map((n) => bar(n, values[n], n === best)).join("");
-}
-
-function icons(seg) {
-  return BRANCHES.map((b) => {
-    const on = seg.branches[b].present;
-    return `<span class="icon${on ? "" : " off"}" title="${PLAIN_BRANCH[b]}: ${on ? "used" : "not used"}">${ICONS[b]}${b === "audio" ? "sound" : b}</span>`;
-  }).join("");
-}
-
-function frameStrip(seg, caption) {
-  if (!seg.frames.length) return '<p class="note">No video frames (audio-only clip).</p>';
-  return `<div class="frames">${seg.frames.map((f) => `
-    <div class="frame ${caption ? (f.body_used ? "used" : "unused") : ""}">
-      <img alt="frame at ${secs(f.time_s)}" src="data:image/jpeg;base64,${f.jpeg}">
-      ${secs(f.time_s)}${caption ? `<br>${f.body_used ? "✓ used" : `✗ ${f.dogs ?? "?"} dogs`}` : ""}
-    </div>`).join("")}</div>`;
-}
-
-function section(step, title, key, body) {
-  return `<div class="card"><h3><span class="step">${step}</span>${esc(title)}</h3>
-    <p class="lead">${esc(LEADS[key])}</p>${body}</div>`;
-}
+document.addEventListener("click", (e) => {
+  const button = e.target.closest(".tab[data-tab]");
+  if (!button) return;
+  const set = button.closest(".tabset");
+  set.querySelectorAll(":scope > .tabs > .tab").forEach((b) => {
+    b.classList.toggle("on", b === button);
+    b.setAttribute("aria-selected", String(b === button));
+  });
+  set.querySelectorAll(":scope > .tab-panel").forEach((p) => { p.hidden = p.dataset.panel !== button.dataset.tab; });
+  tabMemory[set.dataset.tabset] = button.dataset.tab;
+  redrawDiagrams();
+});
 
 // ---------- model diagram ----------
 
-// Plain-language explanation of every box in the diagram (tech = the model behind it).
+// Short explanation of every box in the diagram (tech = the model behind it).
 const STEPS = {
   input: {
     title: "Your clip", sub: "video or audio",
-    plain: "The video (or audio file) you upload. Sound alone is enough, but with video the app can also look at the dog and its surroundings.",
-    tech: "Any common video or audio format; the audio is resampled to 16 kHz.",
+    plain: "Sound alone is enough. With video, the app also reads the dog and its surroundings.",
+    tech: "Any common video or audio format; audio is resampled to 16 kHz.",
   },
   pre: {
     title: "Find the barks", sub: "bark detector",
-    plain: "The app listens through the whole clip and marks every moment the dog barks, growls, whines or howls. Each moment is judged on its own, and a few still frames are taken from the video for it.",
+    plain: "Marks every bark, growl, whine or howl. Each one is judged on its own.",
     tech: LEADS.preprocessing,
   },
   "audio-enc": {
     title: "Listen", sub: "BEATs", branch: "audio",
-    plain: "A large sound model, already trained on a huge library of everyday sounds, turns the bark into a list of numbers that describe how it sounds: pitch, harshness, rhythm and so on.",
+    plain: "A large pretrained sound model turns the bark into numbers: pitch, harshness, rhythm.",
     tech: "Frozen BEATs audio encoder → one embedding per segment.",
   },
   "audio-head": {
     title: "Score the sound", sub: "linear heads", branch: "audio",
-    plain: "Small layers trained on our labelled barks turn those numbers into a score for each of the five situations. They also estimate how worked up the dog sounds (arousal) and whether the mood seems positive or negative (valence).",
+    plain: "Scores the 5 situations, plus how worked up (arousal) and how positive (valence) it sounds.",
     tech: "Linear heads for situation (5 categories), arousal and valence.",
   },
   "body-enc": {
     title: "Spot the pose", sub: "YOLO11-pose", branch: "body",
-    plain: "A pose model finds the dog in each frame and marks points such as the nose, ears, tail and paws. Only frames with exactly one dog are used, so the app knows whose body it is reading.",
+    plain: "Finds nose, ears, tail and paws. Only frames with exactly one dog are used.",
     tech: "YOLO11m-pose, fine-tuned on dog keypoints.",
   },
   "body-head": {
     title: "Read the body", sub: "pose network", branch: "body",
-    plain: "A small network reads the posture (how high the tail, ears and head are) and scores the five situations.",
+    plain: "Reads tail, ear and head height and scores the 5 situations.",
     tech: "Pose decoder (MLP) on keypoint features, averaged over the usable frames.",
   },
   "scene-enc": {
     title: "Look around", sub: "CLIP", branch: "scene",
-    plain: "A model that understands both pictures and words looks at each frame as a whole: who and what is around the dog.",
+    plain: "A picture-and-text model looks at each whole frame: who and what is around.",
     tech: "Frozen CLIP ViT-B/32 image encoder.",
   },
   "scene-head": {
     title: "Match the scene", sub: "text prompts", branch: "scene",
-    plain: "Each frame is compared with a short written description of every situation, and the best matches are combined over the frames. This is the weakest clue on its own.",
+    plain: "Matches each frame against a description of every situation. Weakest clue on its own.",
     tech: LEADS.scene,
   },
   fusion: {
     title: "Combine", sub: "fusion head",
-    plain: "The three opinions are weighed together. The combiner was trained on our labelled videos, so it has learned how much to trust each clue, and it still works when a clue is missing (for example, no dog in view).",
+    plain: "Weighs the 3 clues, trusting some more than others. Still works when one is missing.",
     tech: LEADS.fusion,
   },
   result: {
     title: "Answer", sub: "5 situations",
-    plain: "The final estimate: a percentage for each of the five situations, adding up to 100%. The highest one is shown as the answer.",
+    plain: "A percentage per situation, adding up to 100%. The highest is the answer.",
     tech: "Softmax of the temperature-scaled fusion logits.",
   },
 };
@@ -269,7 +277,7 @@ const NODE_W = 116;
 const NODE_H = 48;
 const CYCLE_S = 5;  // one pass of the dots from clip to answer
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-const diagrams = [];
+let diagrams = [];
 
 function geometry(vertical) {
   const pad = 8;
@@ -345,17 +353,21 @@ function diagramSVG(vertical, opts) {
 
 function explainHTML(id, prefix = "") {
   const step = STEPS[id];
-  return `<h5>${prefix}${esc(step.title)}</h5><p>${esc(step.plain)}</p><p class="tech">Under the hood: ${esc(step.tech)}</p>`;
+  return `<h5>${prefix}${esc(step.title)}</h5><p>${esc(step.plain)}</p><p class="tech">${esc(step.tech)}</p>`;
 }
 
+const IDLE_NOTE = '<p class="note">Tap a box.</p>';
+
 // Draws a diagram into `host` and keeps it in the right orientation when the window resizes.
+// opts.explain = false hides the explanation box.
 function mountDiagram(host, opts = {}) {
   const d = { host, opts, vertical: null, selected: null, active: null };
-  host.innerHTML = '<div class="svg-host"></div><div class="explain" aria-live="polite"></div>';
+  host.innerHTML = `<div class="svg-host"></div>${opts.explain === false ? "" : '<div class="explain" aria-live="polite"></div>'}`;
   d.explain = host.querySelector(".explain");
-  d.explain.innerHTML = '<p class="note">Tap any box to see what it does.</p>';
+  if (d.explain) d.explain.innerHTML = IDLE_NOTE;
   d.render = () => {
-    const vertical = host.clientWidth > 0 && host.clientWidth < 600;
+    if (host.clientWidth === 0) return;  // hidden: draw once it is shown
+    const vertical = host.clientWidth < 600;
     if (vertical === d.vertical) return;
     d.vertical = vertical;
     host.querySelector(".svg-host").innerHTML = diagramSVG(vertical, opts);
@@ -368,13 +380,13 @@ function mountDiagram(host, opts = {}) {
   };
   d.select = (id) => {
     d.selected = id;
-    d.explain.innerHTML = explainHTML(id);
+    if (d.explain) d.explain.innerHTML = explainHTML(id);
     d.paint();
   };
   // Highlight the boxes that are running now (null = show everything).
   d.setActive = (ids) => {
     d.active = ids;
-    if (ids) d.explain.innerHTML = explainHTML(ids[0], "Now: ");
+    if (d.explain) d.explain.innerHTML = ids ? explainHTML(ids[0], "Now: ") : IDLE_NOTE;
     d.paint();
   };
   d.paint = () => {
@@ -388,6 +400,15 @@ function mountDiagram(host, opts = {}) {
   diagrams.push(d);
   d.render();
   return d;
+}
+
+// Draw again every diagram that is attached (needed after it was hidden or the width changed).
+function redrawDiagrams() {
+  diagrams.forEach((d) => {
+    if (!document.body.contains(d.host)) return;
+    d.vertical = null;
+    d.render();
+  });
 }
 
 let resizeTimer = null;
@@ -405,85 +426,96 @@ function activeIds(s) {
   return ["result"];
 }
 
+// ---------- static pages ----------
+
+$("clue-chips").innerHTML = BRANCHES.map((b) => `<span class="clue-chip ${b}">${ICONS[b]}${PLAIN_BRANCH[b]}</span>`).join("");
+
+$("numbers").innerHTML = [
+  ["16", "kHz audio"], ["3", "clues"], ["18", "fusion inputs"], ["5", "situations"],
+].map(([n, label]) => `<div class="card"><b class="num">${n}</b><span>${label}</span></div>`).join("");
+
+$("situations").innerHTML = CATEGORIES.map((c) => `<div class="sit" style="--c:${catColor(c)}" tabindex="0" data-tip="${esc(MEANING_LONG[c])}">
+  <span class="dotcell c-${c}" style="background:${catColor(c)}">${ABBR[c]}</span>
+  <div><b>${esc(DISPLAY[c])}</b><span>${esc(MEANING[c])}</span></div></div>`).join("");
+
 const howDiagram = mountDiagram($("how-diagram"));
-$("glossary").innerHTML = CATEGORIES.map((c) => `<dt>${esc(DISPLAY[c])}</dt><dd>${esc(MEANING[c])}</dd>`).join("");
-// The panel may start hidden (closed); draw again once it has a width.
-$("how").addEventListener("toggle", () => { howDiagram.vertical = null; howDiagram.render(); });
+const liveDiagram = mountDiagram($("live-diagram"));
 
-// ---------- plain-language helpers ----------
+// ---------- views + routing ----------
+//   #/how      how it works
+//   #bark-N    one bark (once results exist)
+//   anything else: results if there are any, else the upload page
 
-function certainty(p) {
-  if (p >= 0.7) return "confident";
-  if (p >= 0.45) return "fairly sure";
-  return "unsure";
+function showView(name) {
+  ["upload", "results", "how"].forEach((v) => { $(`view-${v}`).hidden = v !== name; });
+  document.querySelectorAll("[data-nav]").forEach((a) => a.classList.toggle("on", a.dataset.nav === (name === "how" ? "how" : "home")));
+  redrawDiagrams();
 }
 
-function ranked(probs) {
-  return probs.map((p, i) => [p, i]).sort((a, b) => b[0] - a[0]);
-}
+let openedFromList = false;
+let detailIndex = null;
 
-// How much a branch pushed the chosen category above the others in the fusion head.
-// Softmax ignores a shift shared by all categories, so compare with the branch's mean push.
-function branchEffect(f, branch, best) {
-  const c = f.contributions[branch];
-  const mean = c.reduce((a, b) => a + b, 0) / c.length;
-  return c[best] - mean;
-}
-
-function effectChip(value) {
-  if (value > 1) return '<span class="effect pos">Strongly supported the answer</span>';
-  if (value > 0.25) return '<span class="effect pos">Supported the answer</span>';
-  if (value >= -0.25) return '<span class="effect">Little effect on the answer</span>';
-  return '<span class="effect neg">Weighed against the answer</span>';
-}
-
-function notUsedReason(seg, branch) {
-  if (branch === "audio") return "the sound could not be used";
-  if (branch === "body") return seg.body_reason || "no usable frames";
-  return "there are no video frames";
-}
-
-// ---------- results: list page ----------
-
-function showResults(status) {
-  segments = status.results || [];
-  $("results").hidden = false;
-  $("how").open = false;
-  howDiagram.setActive(null);
-  howDiagram.explain.innerHTML = '<p class="note">Tap any box to see what it does.</p>';
-  $("player").src = `/api/jobs/${job}/video`;
-  history.replaceState(null, "", location.pathname + location.search);
-  route();
-  const found = segments.filter((s) => s.fused.present);
-  $("overview").innerHTML = "";
-  $("clip-charts").innerHTML = "";
-  if (!segments.length) {
-    $("summary").textContent = `${status.filename}: no barks found.`;
-    $("segments").innerHTML = '<div class="card empty" style="margin:0;border:0">No dog vocalization was detected in this clip.</div>';
+function route() {
+  if (location.hash === "#/how") { showView("how"); return; }
+  if (!clip) { showView("upload"); return; }
+  const match = location.hash.match(/^#bark-(\d+)$/);
+  const index = match ? segments.findIndex((s) => s.number === Number(match[1])) : -1;
+  const detail = index >= 0;
+  showView("results");
+  $("list-view").hidden = detail;
+  $("list-nav").hidden = detail;
+  $("detail-view").hidden = !detail;
+  $("detail-nav").hidden = !detail;
+  if (detail) {
+    renderDetail(index);
+    window.scrollTo({ top: 0, behavior: "smooth" });
     return;
   }
-  const counts = {};
-  found.forEach((s) => { counts[s.category] = (counts[s.category] || 0) + 1; });
-  const byCount = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-  // Only name a "most often" category when it clearly leads (no tie, more than one bark).
-  const common = byCount.length && counts[byCount[0]] > 1 && counts[byCount[0]] > (counts[byCount[1]] || 0) ? byCount[0] : null;
-  $("summary").innerHTML = `<strong>${esc(status.filename)}</strong>: found ${segments.length} bark${segments.length === 1 ? "" : "s"}.`
-    + (common ? ` Most often: <strong>${esc(DISPLAY[common])}</strong> (${counts[common]} of ${segments.length}).` : "")
-    + " Click a bark to see why.";
-  $("segments").innerHTML = segments.map((seg, i) => {
-    const verdict = seg.fused.present
-      ? `${esc(DISPLAY[seg.category])}<span class="pct">${pct(seg.probability, 0)}</span><span class="sure">· ${certainty(seg.probability)}</span>`
-      : '<span class="time">no clue could be used</span>';
-    return `<button type="button" class="seg-row" data-index="${i}" aria-label="Open bark ${seg.number}">
-      <span class="n">#${seg.number}</span>
-      <span class="time">${seg.start_s.toFixed(2)}–${seg.end_s.toFixed(2)} s</span>
-      <span class="verdict-cell">${verdict}</span>
-      <span class="icons">${icons(seg)}</span>
-      <span class="chev" aria-hidden="true">›</span></button>`;
-  }).join("");
-  document.querySelectorAll(".seg-row").forEach((row) => row.addEventListener("click", () => openSegment(Number(row.dataset.index))));
-  renderOverview();
+  openedFromList = false;
+  detailIndex = null;
+  renderListSide();
+  renderTimeline();
 }
+
+window.addEventListener("hashchange", route);
+
+function openSegment(index) {
+  openedFromList = true;
+  location.hash = `bark-${segments[index].number}`;
+}
+
+function goToSegment(index) {
+  if (index < 0 || index >= segments.length) return;
+  history.replaceState(null, "", `#bark-${segments[index].number}`);
+  route();
+}
+
+function backToList() {
+  if (openedFromList) history.back();
+  else { history.replaceState(null, "", location.pathname + location.search); route(); }
+}
+
+document.addEventListener("keydown", (e) => {
+  if ($("detail-view").hidden || $("view-results").hidden || e.target.closest("input, video, [role=tab]")) return;
+  if (e.key === "Escape") backToList();
+  if (e.key === "ArrowLeft") goToSegment(detailIndex - 1);
+  if (e.key === "ArrowRight") goToSegment(detailIndex + 1);
+});
+$("back").addEventListener("click", backToList);
+$("prev").addEventListener("click", () => goToSegment(detailIndex - 1));
+$("next").addEventListener("click", () => goToSegment(detailIndex + 1));
+$("new-clip").addEventListener("click", () => {
+  clip = null;
+  segments = [];
+  $("player").removeAttribute("src");
+  $("player").load();
+  history.replaceState(null, "", location.pathname + location.search);
+  route();
+});
+
+// ---------- player + timeline ----------
+
+let stopAt = null;
 
 // Clip length in seconds: the player's once it has loaded, else the end of the last bark.
 function clipDuration() {
@@ -493,7 +525,7 @@ function clipDuration() {
 }
 
 function bindOpeners(root) {
-  root.querySelectorAll("[data-index].tl-bark, [data-index].mix-col").forEach((el) =>
+  root.querySelectorAll("[data-index].tl-bark, [data-index].mix-col, [data-index].bark-card").forEach((el) =>
     el.addEventListener("click", (e) => { e.stopPropagation(); openSegment(Number(el.dataset.index)); }));
 }
 
@@ -506,21 +538,12 @@ function bindSeek(root) {
   }));
 }
 
-function renderOverview() {
-  if (!segments.length) return;
-  const duration = clipDuration();
-  $("overview").innerHTML = clipStats(segments, duration)
-    + `<div class="card"><h3>When the dog vocalized</h3>
-      <p class="lead">Each block is one bark, colored by its answer. Click a block to open it, or the lane to jump the video there.</p>
-      ${clipTimeline(segments, duration)}${categoryLegend()}</div>`;
-  $("clip-charts").innerHTML = `<div class="card"><h3>Situations in this clip</h3>${situationCounts(segments)}</div>`
-    + `<div class="card"><h3>Situation mix per bark</h3>
-      <p class="lead">Each column is one bark's full answer, adding up to 100%. Click a column to open the bark.</p>
-      ${mixColumns(segments)}</div>`
-    + `<div class="card"><h3>Did the clues agree?</h3>
-      <p class="lead">Each clue's own top pick for every bark, against the combined answer (✓ = same as the answer, – = clue not used).</p>
-      ${agreementMatrix(segments)}</div>`;
-  [$("overview"), $("clip-charts")].forEach((root) => { bindOpeners(root); bindSeek(root); });
+function renderTimeline() {
+  const host = $("timeline-host");
+  if (!segments.length) { host.innerHTML = ""; return; }
+  host.innerHTML = clipTimeline(segments, clipDuration(), { focus: detailIndex });
+  bindOpeners(host);
+  bindSeek(host);
   movePlayhead();
 }
 
@@ -533,65 +556,9 @@ function movePlayhead() {
 }
 
 $("player").addEventListener("loadedmetadata", () => {
-  renderOverview();
-  if (!$("detail-view").hidden) renderDetailTimeline();
+  renderTimeline();
+  if (detailIndex == null && clip) renderListSide();
 });
-
-let detailIndex = null;
-
-function renderDetailTimeline() {
-  const host = $("seg-timeline");
-  if (!host || detailIndex == null) return;
-  host.innerHTML = clipTimeline(segments, clipDuration(), { focus: detailIndex });
-  bindOpeners(host);
-  bindSeek(host);
-  movePlayhead();
-}
-
-// ---------- results: detail page (#bark-N in the address bar) ----------
-
-let openedFromList = false;
-let stopAt = null;
-
-function openSegment(index) {
-  openedFromList = true;
-  location.hash = `bark-${segments[index].number}`;
-}
-
-function goToSegment(index) {
-  history.replaceState(null, "", `#bark-${segments[index].number}`);
-  route();
-}
-
-function backToList() {
-  if (openedFromList) history.back();
-  else { history.replaceState(null, "", location.pathname + location.search); route(); }
-}
-
-function route() {
-  const match = location.hash.match(/^#bark-(\d+)$/);
-  const index = match ? segments.findIndex((s) => s.number === Number(match[1])) : -1;
-  const showDetail = index >= 0;
-  $("list-view").hidden = showDetail;
-  $("detail-view").hidden = !showDetail;
-  if (!showDetail) {
-    openedFromList = false;
-    diagrams.splice(1);  // drop the detail diagram, keep "How it works"
-    return;
-  }
-  renderDetail(index);
-  $("results").scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-window.addEventListener("hashchange", route);
-document.addEventListener("keydown", (e) => {
-  if ($("detail-view").hidden || e.target.closest("input, video")) return;
-  if (e.key === "Escape") backToList();
-});
-$("back").addEventListener("click", backToList);
-$("prev").addEventListener("click", () => goToSegment(Number($("prev").dataset.index)));
-$("next").addEventListener("click", () => goToSegment(Number($("next").dataset.index)));
-
 $("player").addEventListener("timeupdate", () => {
   movePlayhead();
   if (stopAt != null && $("player").currentTime >= stopAt) { $("player").pause(); stopAt = null; }
@@ -606,193 +573,233 @@ function playSegment(seg) {
   player.play();
 }
 
+// ---------- results: list ----------
+
+function certainty(p) {
+  if (p >= 0.7) return "confident";
+  if (p >= 0.45) return "fairly sure";
+  return "unsure";
+}
+
+function ranked(probs) {
+  return probs.map((p, i) => [p, i]).sort((a, b) => b[0] - a[0]);
+}
+
+function showResults(status) {
+  clip = status;
+  segments = status.results || [];
+  $("clip-name").textContent = status.filename;
+  $("player").src = `/api/jobs/${job}/video`;
+  $("player-card").classList.toggle("audio-only", segments.length > 0 && !segments.some((s) => s.has_video));
+  renderList();
+  if (location.hash !== "#/how") history.replaceState(null, "", location.pathname + location.search);
+  route();
+}
+
+function renderListSide() {
+  $("side").innerHTML = segments.length
+    ? clipSummary(segments)
+    : `<div class="headline"><span class="kicker">Result</span><b>No barks found</b></div>`;
+}
+
+function renderList() {
+  if (!segments.length) {
+    $("bark-grid").innerHTML = `<div class="card empty">
+      <span class="empty-icon">${ICONS.audio}</span><b>No barks found</b><span>No dog sound was detected in this clip.</span></div>`;
+    return;
+  }
+  $("bark-grid").innerHTML = segments.map((seg, i) => barkCard(seg, i)).join("");
+  bindOpeners($("bark-grid"));
+}
+
+// ---------- results: one bark (#bark-N) ----------
+
+// How much a branch pushed the chosen category above the others in the fusion head.
+// Softmax ignores a shift shared by all categories, so compare with the branch's mean push.
+function branchEffect(f, branch, best) {
+  const c = f.contributions[branch];
+  const mean = c.reduce((a, b) => a + b, 0) / c.length;
+  return c[best] - mean;
+}
+
+function notUsedReason(seg, branch) {
+  if (branch === "audio") return "sound could not be used";
+  if (branch === "body") return seg.body_reason || "no usable frames";
+  return "no video frames";
+}
+
 function renderDetail(index) {
   const seg = segments[index];
   const player = $("player");
   player.pause();
-  player.currentTime = seg.start_s;
-  $("detail-pos").textContent = `Bark ${index + 1} of ${segments.length}`;
+  if (player.readyState > 0) player.currentTime = seg.start_s;
+  $("detail-pos").textContent = `${index + 1} / ${segments.length}`;
   $("prev").disabled = index === 0;
   $("next").disabled = index === segments.length - 1;
-  $("prev").dataset.index = index - 1;
-  $("next").dataset.index = index + 1;
-
-  $("detail").innerHTML = [
-    answerCard(seg), cluesCard(seg), opinionMatrix(seg),
-    `<div class="card"><h3>How this answer was made</h3>
-      <p class="lead">The same steps as in "How it works", filled in for this bark. Dashed boxes were skipped.</p>
-      <div id="seg-diagram" class="diagram"></div></div>`,
-    `<details class="card tech-details"><summary>Technical details <span class="note">(model outputs, for the curious)</span></summary>
-      ${[preprocessingSection(seg), audioSection(seg), bodySection(seg), sceneSection(seg), fusionSection(seg), resultSection(seg)].join("")}
-    </details>`,
-  ].join("");
-  $("play-seg").addEventListener("click", () => playSegment(seg));
   detailIndex = index;
-  renderDetailTimeline();
-  diagrams.splice(1);
-  mountDiagram($("seg-diagram"), segmentDiagramOpts(seg));
+
+  $("side").innerHTML = answerSide(seg);
+  $("play-seg").addEventListener("click", () => playSegment(seg));
+  renderTimeline();
+
+  $("detail").innerHTML = `<h3 class="section-title"><span>What each clue said</span></h3>${cluesPanel(seg)}
+    <details class="card tech" id="tech"${techOpen ? " open" : ""}>
+      <summary>Technical details</summary>${internals(seg)}</details>`;
+  $("tech").addEventListener("toggle", () => { techOpen = $("tech").open; });
 }
 
-function answerCard(seg) {
-  const head = `<div class="answer-head"><div><div class="kicker">Bark #${seg.number} · <span class="nocaps">${seg.start_s.toFixed(2)}–${seg.end_s.toFixed(2)} s</span></div>`;
-  const play = '<button type="button" id="play-seg">▶ Play this bark</button></div>';
+let techOpen = false;
+
+function answerSide(seg) {
+  const play = `<button type="button" id="play-seg" class="play-btn">▶ Play bark</button>`;
+  const when = `<span class="time">Bark #${seg.number} · ${span(seg)}</span>`;
   if (!seg.fused.present) {
-    return `<div class="card">${head}<div class="answer">No answer</div></div>${play}
-      <p class="meaning">None of the three clues could be used for this moment, so the app cannot make a guess.</p>
-      <h4>Where this bark is in the clip</h4><div id="seg-timeline"></div></div>`;
+    return `<div class="headline"><span class="kicker">Result</span><b>No answer</b></div>
+      <p class="meaning">None of the 3 clues could be used.</p><div class="side-foot">${play}${when}</div>`;
   }
   const order = ranked(seg.fused.probs);
-  const [p1, i1] = order[0];
+  const [p1] = order[0];
   const [p2, i2] = order[1];
-  const word = certainty(p1);
   const close = p1 - p2 < 0.15
-    ? ` <strong>${esc(DISPLAY[CATEGORIES[i2]])}</strong> is a close second (${pct(p2, 0)}), so it could be either.`
-    : ` The next most likely is ${esc(DISPLAY[CATEGORIES[i2]])} (${pct(p2, 0)}).`;
-  return `<div class="card">${head}
-      <div class="kicker">Most likely situation</div>
-      <div class="answer">${esc(DISPLAY[seg.category])} <span class="pct">${pct(p1, 0)}</span></div></div>${play}
-    <p class="meaning">${esc(MEANING[seg.category])}</p>
-    <p class="certainty">The model is <strong>${word}</strong>: it gives this ${pct(p1, 0)}. With five options, a blind guess would get 20%.${close}</p>
-    ${statTiles([
-      { label: "Top chance", value: pct(p1, 0), note: `${(p1 / 0.2).toFixed(1)}× a blind guess` },
-      { label: "Lead over 2nd", value: `${((p1 - p2) * 100).toFixed(0)}<small> pts</small>`, note: `ahead of ${SHORT[CATEGORIES[i2]]}` },
-      { label: "Uncertainty", value: pct(uncertainty(seg.fused.probs), 0), note: "0% = certain, 100% = no idea" },
-      { label: "Clues used", value: `${BRANCHES.filter((b) => seg.branches[b].present).length}<small> / 3</small>`, note: `${(seg.end_s - seg.start_s).toFixed(2)} s long` },
-    ])}
-    <h4>Chance of each situation</h4>${categoryBars(seg.fused.probs)}
-    <p class="note">These percentages are the model's estimate, not a certainty. The app reads patterns in sound and video; it does not translate barking.</p>
-    <h4>Where this bark is in the clip</h4><div id="seg-timeline"></div>
-  </div>`;
+    ? `<div class="close-call">Close call with <b>${esc(SHORT[CATEGORIES[i2]])}</b> (${pct(p2, 0)})</div>` : "";
+  return `<div class="headline" style="--c:${catColor(seg.category)}">
+      <span class="kicker">Most likely</span><b><span class="dot"></span>${esc(DISPLAY[seg.category])}</b>
+      <span class="meaning" data-tip="${esc(MEANING_LONG[seg.category])}">${esc(MEANING[seg.category])}</span></div>
+    <div class="answer-viz">${donut(seg.fused.probs, pct(p1, 0), certainty(p1), (i) => `${DISPLAY[CATEGORIES[i]]}: ${pct(seg.fused.probs[i])}`)}
+      ${probLegend(seg.fused.probs)}</div>
+    ${close}
+    <div class="side-foot">${play}${when}</div>`;
 }
 
-function cluesCard(seg) {
+function cluesPanel(seg) {
   const f = seg.fusion;
   const best = seg.fused.present ? argmax(seg.fused.probs) : null;
-  const tiles = BRANCHES.map((b) => {
+  const cards = BRANCHES.map((b) => {
     const out = seg.branches[b];
-    const title = `<h5>${ICONS[b]}${PLAIN_BRANCH[b]}</h5>`;
+    const head = `<div class="clue-head">${ICONS[b]}<span>${PLAIN_BRANCH[b]}</span>${info(CLUE_HINT[b])}</div>`;
     if (!out.present) {
-      return `<div class="clue ${b} off">${title}<p><strong>Not used</strong>: ${esc(notUsedReason(seg, b))}.</p>
-        <p class="note">The answer was made without this clue.</p></div>`;
+      return `<div class="clue ${b} off">${head}<div class="clue-off">Not used</div><p class="note">${esc(notUsedReason(seg, b))}</p></div>`;
     }
     const top = argmax(out.probs);
+    const category = CATEGORIES[top];
     const agrees = top === best;
-    return `<div class="clue ${b}">${title}
-      <p>Leaned toward <strong>${esc(DISPLAY[CATEGORIES[top]])}</strong> (${pct(out.probs[top], 0)})${agrees ? ", same as the answer" : ""}.</p>
-      ${f && best != null ? effectChip(branchEffect(f, b, best)) : ""}
-      <p class="note" style="margin-top:6px">${esc(CLUE_HINT[b])}</p></div>`;
+    return `<div class="clue ${b}">${head}
+      <div class="clue-pick"><span class="clue-pct num">${pct(out.probs[top], 0)}</span>
+        <span class="clue-cat"><span class="dot" style="--c:${catColor(category)}"></span>${esc(SHORT[category])}</span>
+        ${best == null ? "" : agrees ? '<span class="agree-tag yes">✓ agrees</span>' : '<span class="agree-tag">differs</span>'}</div>
+      ${miniColumns(out.probs, PLAIN_BRANCH[b])}
+      ${f && best != null ? effectBadge(branchEffect(f, b, best)) : ""}</div>`;
   }).join("");
-  return `<div class="card"><h3>What each clue said</h3>
-    <p class="lead">Each clue makes its own guess. The combiner then weighs them, trusting some clues more than others.</p>
-    <div class="clues">${tiles}</div></div>`;
+  return `<div class="clues">${cards}</div>`;
 }
 
-function segmentDiagramOpts(seg) {
-  const off = BRANCHES.filter((b) => !seg.branches[b].present).flatMap((b) => [`${b}-enc`, `${b}-head`]);
-  const head = (b) => {
-    const out = seg.branches[b];
-    if (!out.present) return "not used";
-    const top = argmax(out.probs);
-    return `${SHORT[CATEGORIES[top]]} ${pct(out.probs[top], 0)}`;
-  };
-  const usedFrames = seg.frames.filter((fr) => fr.body_used).length;
-  const nClues = BRANCHES.filter((b) => seg.branches[b].present).length;
-  if (!seg.fused.present) off.push("fusion", "result");
-  return {
-    off,
-    subs: {
-      input: "this clip",
-      pre: `${seg.start_s.toFixed(2)}–${seg.end_s.toFixed(2)} s`,
-      "audio-enc": seg.branches.audio.present ? "sound found" : "not used",
-      "audio-head": head("audio"),
-      "body-enc": seg.branches.body.present ? `${usedFrames} of ${seg.frames.length} frames` : "not used",
-      "body-head": head("body"),
-      "scene-enc": seg.branches.scene.present ? `${seg.frames.length} frames` : "not used",
-      "scene-head": head("scene"),
-      fusion: `${nClues} of 3 clues`,
-      result: seg.fused.present ? `${SHORT[seg.category]} ${pct(seg.probability, 0)}` : "no answer",
-    },
-  };
+// ---------- model internals (one sub-tab per step) ----------
+
+function internals(seg) {
+  return tabset("internals", [
+    { key: "detect", label: "Detect", html: preprocessingSection(seg) },
+    { key: "audio", label: "Sound", html: audioSection(seg) },
+    { key: "body", label: "Body", html: bodySection(seg) },
+    { key: "scene", label: "Scene", html: sceneSection(seg) },
+    { key: "fusion", label: "Fusion", html: fusionSection(seg) },
+  ]);
 }
 
-// ---------- technical detail sections ----------
+function section(key, body) {
+  return `<p class="lead">${esc(LEADS[key])}</p>${body}`;
+}
+
+function bar(label, value, top = false) {
+  return `<div class="row${top ? " top" : ""}"><span>${esc(label)}</span>
+    <div class="track"><div class="fill" style="width:${(value * 100).toFixed(1)}%"></div></div>
+    <span class="num">${pct(value)}</span></div>`;
+}
+
+function namedBars(values) {
+  const names = Object.keys(values);
+  const best = names.reduce((a, b) => (values[b] > values[a] ? b : a), names[0]);
+  return names.map((n) => bar(n, values[n], n === best)).join("");
+}
+
+function frameStrip(seg, caption) {
+  if (!seg.frames.length) return '<p class="note">No video frames (audio-only clip).</p>';
+  return `<div class="frames">${seg.frames.map((f) => `
+    <div class="frame ${caption ? (f.body_used ? "used" : "unused") : ""}">
+      <img alt="frame at ${secs(f.time_s)}" src="data:image/jpeg;base64,${f.jpeg}">
+      ${secs(f.time_s)}${caption ? `<br>${f.body_used ? "✓ used" : `✗ ${f.dogs ?? "?"} dogs`}` : ""}
+    </div>`).join("")}</div>`;
+}
 
 function preprocessingSection(seg) {
-  const chips = soundLanes(seg);
-  return section(1, "Preprocessing", "preprocessing", `
-    <dl class="kv">
-      <dt>Time</dt><dd>${seg.start_s.toFixed(2)} – ${seg.end_s.toFixed(2)} s (${(seg.end_s - seg.start_s).toFixed(2)} s)</dd>
-      <dt>Bark-detector confidence</dt><dd>${seg.confidence == null ? "unknown" : seg.confidence.toFixed(2)}
-        <span class="note">(mean dog-vocalization score, not a calibrated probability)</span></dd>
-      <dt>Frames sampled</dt><dd>${seg.num_frames}${seg.has_video ? "" : " (no video)"}</dd>
-    </dl>
-    <h4>Sound sections</h4>${chips}
+  return section("preprocessing", `
+    ${statTiles([
+      { label: "Length", value: `${(seg.end_s - seg.start_s).toFixed(2)}<small> s</small>`, note: span(seg) },
+      { label: "Detector score", value: seg.confidence == null ? "–" : seg.confidence.toFixed(2), note: "mean, not calibrated" },
+      { label: "Frames", value: String(seg.num_frames), note: seg.has_video ? "sampled" : "no video" },
+    ])}
+    <h4>Sound sections</h4>${soundLanes(seg)}
     <h4>Sampled frames</h4>${frameStrip(seg, false)}`);
 }
 
 function audioSection(seg) {
   const out = seg.branches.audio;
-  if (!out.present) return section(2, "Audio", "audio", '<p class="note">Not used: the segment has no usable audio.</p>');
+  if (!out.present) return section("audio", '<p class="note">Not used: the segment has no usable audio.</p>');
   const x = out.extras;
   const nudge = x.nudge ? CATEGORIES.map((c) => {
     const v = x.nudge[c];
     return `<div class="row"><span>${esc(DISPLAY[c])}</span><span></span>
       <span class="num ${v > 0 ? "pos" : v < 0 ? "neg" : ""}">${signed(v)}</span></div>`;
   }).join("") : "";
-  return section(2, "Audio", "audio", `
-    <h4>Situation (5 categories)</h4>${categoryBars(out.probs)}
-    ${x.arousal ? `<h4>Arousal</h4>${namedBars(x.arousal)}` : ""}
-    ${x.valence ? `<h4>Valence</h4>${namedBars(x.valence)}
-      <p class="note">Valence is near chance on unseen dogs (notebook 24): treat it as a weak hint.</p>` : ""}
-    ${nudge ? `<h4>Emotion nudge (logit shift)</h4>${nudge}
-      <p class="note">${Object.values(x.nudge).every((v) => v === 0)
-        ? "All shifts are 0: the saved emotion-nudge weights are zero, so arousal and valence do not change the situation scores."
-        : "How much arousal and valence moved each category's logit before the softmax."}</p>` : ""}`);
+  const zeroNudge = x.nudge && Object.values(x.nudge).every((v) => v === 0);
+  return section("audio", `
+    <div class="split">
+      ${x.arousal ? `<div><h4>Arousal</h4>${namedBars(x.arousal)}</div>` : ""}
+      ${x.valence ? `<div><h4>Valence ${info("Near chance on unseen dogs (notebook 24): a weak hint.")}</h4>${namedBars(x.valence)}</div>` : ""}
+    </div>
+    ${nudge ? `<h4>Emotion nudge (logit shift) ${info(zeroNudge
+      ? "All 0: the saved emotion-nudge weights are zero, so arousal and valence do not change the situation scores."
+      : "How much arousal and valence moved each category's logit before the softmax.")}</h4>${nudge}` : ""}`);
 }
 
 function bodySection(seg) {
   const out = seg.branches.body;
-  const strip = `<h4>Frames (green = used: exactly one dog)</h4>${frameStrip(seg, true)}`;
+  const strip = `<h4>Frames <span class="note">green = used (exactly one dog)</span></h4>${frameStrip(seg, true)}`;
   if (!out.present) {
-    return section(3, "Body", "body", `<p><strong>Not used</strong>: ${esc(seg.body_reason || "unavailable")}.</p>
-      ${seg.has_video ? strip : ""}`);
+    return section("body", `<p><strong>Not used</strong>: ${esc(seg.body_reason || "unavailable")}.</p>${seg.has_video ? strip : ""}`);
   }
   const x = out.extras;
   const cues = [["tail_height", "Tail height"], ["ear_height", "Ear height"], ["head_height", "Head height"]]
     .filter(([name]) => typeof x[name] === "number")
     .map(([name, label]) => ({ label, value: x[name], tip: `${label}: ${signed(x[name], 3)}\n${x[name] >= 0 ? "above" : "below"} its reference point` }));
   const used = seg.frames.filter((f) => f.body_used).length;
-  return section(3, "Body", "body", `
-    <h4>Category probabilities</h4>${categoryBars(out.probs)}
-    ${statTiles([
-      { label: "Frames used", value: `${used}<small> / ${seg.frames.length}</small>`, note: "frames with exactly one dog" },
-    ])}
-    ${strip}
-    <h4>Pose cues (mean over used frames)</h4>
+  return section("body", `
+    ${statTiles([{ label: "Frames used", value: `${used}<small> / ${seg.frames.length}</small>`, note: "exactly one dog" }])}
+    <h4>Pose cues ${info("Mean over used frames, box-normalised. Positive tail height = tail tip above its base. Still poses, no wagging.")}</h4>
     ${cues.length ? divergingBars(cues, "var(--body)") : '<p class="note">No pose cues.</p>'}
-    <p class="note">Box-normalised; positive tail height means the tail tip is above its base. Each frame is a still pose (no wagging).</p>`);
+    ${strip}`);
 }
 
 function sceneSection(seg) {
   const out = seg.branches.scene;
   const s = seg.scene || {};
-  if (!out.present) return section(4, "Scene", "scene", '<p><strong>Not used</strong>: no video frames.</p>');
+  if (!out.present) return section("scene", "<p><strong>Not used</strong>: no video frames.</p>");
   const thumbs = Object.fromEntries(seg.frames.map((f) => [f.time_s.toFixed(3), f.jpeg]));
   const rows = (s.frames || []).map((f) => {
     const jpeg = thumbs[f.time_s.toFixed(3)];
     return `<tr><td>${secs(f.time_s)}</td>
-      <td>${jpeg ? `<img alt="" style="height:40px;max-width:72px;object-fit:cover;border-radius:4px;vertical-align:middle" src="data:image/jpeg;base64,${jpeg}">` : ""}</td>
-      <td style="text-align:left;white-space:normal">${esc(f.top_prompt)}</td><td>${pct(f.score)}</td></tr>`;
+      <td>${jpeg ? `<img alt="" class="thumb" src="data:image/jpeg;base64,${jpeg}">` : ""}</td>
+      <td class="wrap">${esc(f.top_prompt)}</td><td>${pct(f.score)}</td></tr>`;
   }).join("");
-  return section(4, "Scene", "scene", `
-    <h4>Category probabilities</h4>${categoryBars(out.probs)}
-    <dl class="kv"><dt>Aggregation</dt><dd>${esc(s.aggregation || out.extras.aggregation)}</dd>
-      ${s.confidence_weight != null ? `<dt>Confidence weight</dt><dd>${s.confidence_weight}</dd>` : ""}
-      <dt>Temperature</dt><dd>${s.temperature}</dd></dl>
+  return section("scene", `
+    ${statTiles([
+      { label: "Aggregation", value: `<span class="tile-text">${esc(s.aggregation || out.extras.aggregation)}</span>` },
+      ...(s.confidence_weight != null ? [{ label: "Confidence weight", value: String(s.confidence_weight) }] : []),
+      { label: "Temperature", value: String(s.temperature) },
+    ])}
     <p class="note">Raw zero-shot scene scores are below chance on our data; the fusion head learned how much to trust them.</p>
     ${sceneFrameHeatmap(seg)}
     ${rows ? `<h4>Best prompt per frame</h4><div class="scroll"><table>
-      <tr><th>Time</th><th></th><th style="text-align:left">Top prompt</th><th>Score</th></tr>${rows}</table></div>` : ""}`);
+      <tr><th>Time</th><th></th><th class="wrap">Top prompt</th><th>Score</th></tr>${rows}</table></div>` : ""}`);
 }
 
 function contributionChart(f) {
@@ -812,7 +819,7 @@ function contributionChart(f) {
       const width = (Math.abs(v) / extent) * 50;
       const start = v >= 0 ? 50 + right : 50 - left - width;
       if (v >= 0) right += width; else left += width;
-      return `<div class="seg" title="${p}: ${signed(v, 3)}" style="left:${start}%;width:${width}%;background:var(--${p})"></div>`;
+      return `<div class="seg" data-tip="${p}: ${signed(v, 3)}" style="left:${start}%;width:${width}%;background:var(--${p})"></div>`;
     }).join("");
     return `<div class="contrib"><span>${esc(DISPLAY[c])}</span><div class="lane"><div class="zero"></div>${segs}</div>
       <span class="num">${signed(f.logits[i])}</span></div>`;
@@ -824,7 +831,7 @@ function contributionChart(f) {
 
 function fusionSection(seg) {
   const f = seg.fusion;
-  if (!f) return section(5, "Fusion", "fusion", '<p class="note">No branch could run, so there is nothing to fuse.</p>');
+  if (!f) return section("fusion", '<p class="note">No branch could run, so there is nothing to fuse.</p>');
   const present = `<div class="chips">${BRANCHES.map((b) => `<span class="chip${f.present[b] ? "" : " off"}">${b}${f.present[b] ? " present" : " missing"}</span>`).join("")}</div>`;
   const zExtent = Math.max(1, ...f.features.map((x) => Math.abs(x.standardized)));
   const featureRows = f.features.map((x) => {
@@ -838,27 +845,15 @@ function fusionSection(seg) {
   const logitRows = CATEGORIES.map((c, i) => `<tr class="${i === best ? "top" : ""}"><td>${esc(DISPLAY[c])}</td>
     <td>${signed(f.bias[i])}</td>${BRANCHES.map((b) => `<td>${signed(f.contributions[b][i])}</td>`).join("")}
     <td>${signed(f.logits[i])}</td><td>${signed(f.scaled_logits[i])}</td><td>${pct(f.probs[i])}</td></tr>`).join("");
-  return section(5, "Fusion", "fusion", `
-    <h4>Branches</h4>${present}
-    <h4>The 18 inputs</h4>
-    <p class="note">Raw: centred log-probabilities per branch (zeros when the branch is missing), then the present flags.
-      Standardised: (raw − training mean) ÷ training std, which is what the head multiplies by its weights.</p>
-    <div class="scroll"><table><tr><th>Input</th><th>Raw</th><th>Standardised</th><th>−${zExtent.toFixed(1)} · 0 · +${zExtent.toFixed(1)}</th></tr>${featureRows}</table></div>
-    <h4>What pushed each category's logit</h4>
-    <p class="note">Each branch's share = weights × standardised inputs over its 5 inputs and its present flag; bias is the head's constant.
-      Right of the line raises the category, left lowers it.</p>
+  return section("fusion", `
+    ${present}
+    <h4>What pushed each logit ${info("Each branch's share = weights × standardised inputs (its 5 inputs + present flag); bias is the head's constant. Right raises, left lowers.")}</h4>
     ${contributionChart(f)}
-    <h4>Contribution matrix (source × category)</h4>
-    <p class="note">The same numbers as a grid: blue raises a category's logit, red lowers it; the bottom row is their sum.</p>
-    ${contributionMatrix(f)}
-    <h4>Logits ÷ temperature (${f.temperature.toFixed(3)}) → softmax</h4>
+    <h4>Logits ÷ T (${f.temperature.toFixed(3)}) → softmax</h4>
     <div class="scroll"><table><tr><th>Category</th><th>Bias</th><th>Audio</th><th>Body</th><th>Scene</th>
-      <th>Logit</th><th>÷ T</th><th>Probability</th></tr>${logitRows}</table></div>`);
+      <th>Logit</th><th>÷ T</th><th>Probability</th></tr>${logitRows}</table></div>
+    <h4>The 18 inputs ${info("Raw: centred log-probabilities per branch (zeros when missing), then the present flags. Standardised: (raw − training mean) ÷ training std.")}</h4>
+    <div class="scroll"><table><tr><th>Input</th><th>Raw</th><th>Std.</th><th>−${zExtent.toFixed(1)} · 0 · +${zExtent.toFixed(1)}</th></tr>${featureRows}</table></div>`);
 }
 
-function resultSection(seg) {
-  if (!seg.fused.present) return section(6, "Result", "result", '<p class="note">No prediction: no branch could run on this segment.</p>');
-  return section(6, "Result", "result", `
-    <div class="verdict">${esc(DISPLAY[seg.category])} <span class="pct">${pct(seg.probability, 0)}</span></div>
-    ${categoryBars(seg.fused.probs)}`);
-}
+route();
