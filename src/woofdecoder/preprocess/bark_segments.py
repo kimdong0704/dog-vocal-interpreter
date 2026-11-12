@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from itertools import groupby
 from pathlib import Path
 
@@ -74,13 +75,24 @@ def build_segments(
     settings: DetectionSettings,
     source_id: str = "",
     verbose: bool = True,
+    progress: Callable[[str, int, int], None] | None = None,
 ) -> list[BarkSegment]:
+    """Detect dog sounds in a clip and build one BarkSegment per sound.
+
+    progress, if given, is called as progress(stage, done, total) with the stages
+    "extracting audio/frames" and "detecting barks"; it does not change the result.
+    """
+
+    def report(stage: str, done: int, total: int) -> None:
+        if progress is not None:
+            progress(stage, done, total)
 
     path = Path(path)
     if verbose:
         print(f"Building bark segments for {path.name}")
 
     # audio
+    report("extracting audio/frames", 0, 1)
     audio = load_audio_16k(path, verbose=False)
     if audio is None:
         if verbose:
@@ -90,6 +102,7 @@ def build_segments(
         print(f"Audio: {len(audio) / TARGET_SAMPLE_RATE:.2f} s")
 
     # SED class probs
+    report("detecting barks", 0, 1)
     sed_probs = detect_sed_probs(detector, audio)  # shape (num_frames, 6)
     if verbose:
         print(f"Scored {len(sed_probs)} frames of {SED_FRAME_S * 1000:.0f} ms")
@@ -102,6 +115,7 @@ def build_segments(
     # one segment per event
     segments: list[BarkSegment] = []
     for number, (start_s, end_s) in enumerate(events, start=1):
+        report("extracting audio/frames", number - 1, len(events))
         event_probs = sed_probs[frame_range(start_s, end_s)]
         sound_sections = find_sound_sections(event_probs, start_s, settings.threshold)
         confidence = float(vocal_score(event_probs).mean())

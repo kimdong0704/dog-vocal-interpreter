@@ -368,11 +368,25 @@ Then open <http://127.0.0.1:8000>.
 
 ### Step 26: Use it
 
-1. Choose a short video of a dog (or an audio file) and press **Analyze**.
-2. The app finds each dog vocalization and shows, per segment: the predicted category with its
-   probability, every category's probability, and the evidence behind it (sound types,
-   arousal, and the other signals).
-3. If no dog sound is found, it says so.
+1. Choose a short video of a dog (or an audio file, up to 200 MB) and press **Analyze**.
+   A progress bar shows the current step ("Detecting barks…", "Segment 3/7: scene…").
+   Clips run one at a time; a second upload waits until the first is done.
+2. The video appears with one row per detected vocalization: its time range, the fused
+   category and probability, and which branches (audio, body, scene) could run.
+   If no dog sound is found, it says so.
+3. Click a row to jump the video to that segment and open its step-by-step explanation:
+   - **Preprocessing:** time range, bark-detector confidence, sound types, sampled frames.
+   - **Audio:** category, arousal and valence scores (valence is near chance on unseen dogs)
+     and the emotion-nudge shifts.
+   - **Body:** category scores, or why it was not used (no video, or no frame with exactly one
+     dog); which frames it used; tail, ear and head height.
+   - **Scene:** category scores, how frames were combined, and the best prompt per frame.
+   - **Fusion:** the 18 inputs, how much each branch pushed each category, and
+     logits ÷ temperature → probabilities.
+   - **Result:** the final category and all 5 probabilities.
+
+Uploaded files and results are deleted after 1 hour (or when the server stops). Test it with
+`data/test/media_test.mp4`; `pytest tests/test_pipeline.py` runs the same clip without the page.
 
 Keep demo clips short (under a minute) and **never use dataset clips in a public demo**
 (see Data rules).
@@ -384,3 +398,4 @@ Keep demo clips short (under a minute) and **never use dataset clips in a public
 | `FileNotFoundError` for a model or `third_party` file | Redo Sections 3–4 |
 | Very slow | Check `torch.cuda.is_available()` (Step 6) |
 | `ModuleNotFoundError` | Activate `.venv` (Step 5) and rerun Step 6 |
+| Startup error: fusion head trained on other scene settings | `branches.scene` in `configs/pipeline.yaml` changed since notebook 51: undo it, or rerun notebooks 50–51 (Step 23) |

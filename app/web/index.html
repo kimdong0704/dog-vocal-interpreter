@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WoofDecoder</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<main>
+  <h1>Woof<span>Decoder</span></h1>
+  <p class="sub">Upload a clip of a dog. The app finds every bark, growl or whine and makes a best
+    guess at the situation behind it, using three clues: how it <strong>sounds</strong>, the dog's
+    <strong>body language</strong>, and the <strong>surroundings</strong>.</p>
+
+  <div class="card">
+    <form id="upload">
+      <input type="file" id="clip" name="clip" accept="video/*,audio/*" required>
+      <button type="submit" id="analyze">Analyze</button>
+    </form>
+    <div id="progress" class="progress" hidden>
+      <div class="progress-label"><span id="stage">Uploading…</span><span id="pct" class="num"></span></div>
+      <div class="track big"><div class="fill" id="bar"></div></div>
+    </div>
+    <p id="error" class="error" role="alert" hidden></p>
+  </div>
+
+  <details class="card how" id="how" open>
+    <summary><h2>How it works</h2><span class="note">Tap any box to see what it does</span></summary>
+    <div id="how-diagram" class="diagram"></div>
+    <h4>The five situations</h4>
+    <dl class="glossary" id="glossary"></dl>
+  </details>
+
+  <section id="results" hidden>
+    <div class="card player"><video id="player" controls preload="metadata" playsinline></video></div>
+
+    <div id="list-view">
+      <p class="summary" id="summary"></p>
+      <div id="overview"></div>
+      <div id="segments" class="seg-list"></div>
+      <div id="clip-charts"></div>
+    </div>
+
+    <div id="detail-view" hidden>
+      <nav class="detail-nav">
+        <button type="button" class="ghost" id="back">← All barks</button>
+        <span id="detail-pos" class="time"></span>
+        <span class="pager">
+          <button type="button" class="ghost" id="prev" aria-label="Previous bark">‹ Prev</button>
+          <button type="button" class="ghost" id="next" aria-label="Next bark">Next ›</button>
+        </span>
+      </nav>
+      <div id="detail"></div>
+    </div>
+  </section>
+
+  <footer>
+    WoofDecoder estimates the likely <em>context</em> of barking from patterns in sound and video.
+    It does <strong>not</strong> translate dog language. Some models and datasets are licensed for
+    non-commercial use only; this project is for academic, non-commercial use.
+  </footer>
+</main>
+<script src="/static/app.js"></script>
+<script src="/static/charts.js"></script>
+</body>
+</html>

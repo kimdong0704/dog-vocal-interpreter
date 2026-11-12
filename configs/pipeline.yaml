@@ -53,11 +53,9 @@ branches:
     # Replace with values fitted using training data only, not validation/test labels.
     class_bias: [0.0, 0.0, 0.0, 0.0, 0.0]
 
-# Fusion of branch outputs (decided in notebook 50).
+# Learned fusion head (fitted in notebook 51, scored once on test in notebook 52):
+# logistic regression on the 15 branch probabilities + 3 branch-present flags, with a fitted
+# temperature. The folder holds fusion_head.npz and fusion_info.json; retrain -> re-run
+# notebooks 50-52 and save to the same folder.
 fusion:
-  method: weighted_average
-  weights:
-    audio: 0.34
-    body: 0.33
-    scene: 0.33
-  temperature: 1.0
+  dir: models/fusion

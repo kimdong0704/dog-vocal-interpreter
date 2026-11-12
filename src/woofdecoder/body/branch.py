@@ -113,6 +113,7 @@ class BodyBranch(Branch):
         self,
         encoder_path: str | Path | None = None,
         decoder_path: str | Path | None = None,
+        device: str | torch.device | None = None,
     ):
         from ultralytics import YOLO  # imported here so the rest of the package works without it
 
@@ -125,7 +126,7 @@ class BodyBranch(Branch):
                     f"(see configs/pipeline.yaml, branches.body)."
                 )
 
-        self.device = pick_device()
+        self.device = pick_device() if device is None else torch.device(device)
         self.encoder = YOLO(str(encoder_file))
         self.decoder = PoseClassifier().to(self.device)
         self.decoder.load_state_dict(torch.load(decoder_file, map_location=self.device))
@@ -163,8 +164,20 @@ class BodyBranch(Branch):
             present=True,
             extras={
                 "frames_used": mask,
+                "dogs_per_frame": [p["n_dogs"] for p in parsed],
                 "tail_height": float(X[:, 60].mean()),
                 "ear_height": float(X[:, 61].mean()),
                 "head_height": float(X[:, 62].mean()),
             },
         )
+
+    @classmethod
+    def from_config(
+        cls, config: dict | None = None, device: str | torch.device | None = None
+    ) -> BodyBranch:
+        """Build the branch from config["branches"]["body"] on the given device.
+
+        BodyBranch() still works and reads configs/pipeline.yaml with pick_device().
+        """
+        section = (load_config() if config is None else config)["branches"]["body"]
+        return cls(section["pose"], section["head"], device)

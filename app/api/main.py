@@ -1,178 +1,226 @@
-"""Minimal FastAPI app: upload a clip -> preprocessing + audio branch -> predictions.
+"""FastAPI app: upload a clip -> bark detector, audio / body / scene branches, fusion -> a
+step-by-step explanation per detected vocalization.
 
 Run from the repo root:
     uvicorn app.api.main:app
 then open http://127.0.0.1:8000
+
+POST /api/jobs                 upload a video or audio file -> {"job_id": ...}
+GET  /api/jobs/{job_id}        status, stage and progress; the results once done
+GET  /api/jobs/{job_id}/video  the uploaded file, for the page's player (supports seeking)
+
+Models load once at startup and jobs run one at a time (one GPU). Job files are deleted
+JOB_TTL_S after upload.
 """
 
 from __future__ import annotations
 
+import asyncio
+import logging
+import mimetypes
 import shutil
 import tempfile
-from html import escape
+import threading
+import time
+import uuid
+from collections.abc import AsyncIterator
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager, suppress
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
-from woofdecoder.pipeline import Pipeline, SegmentResult
-from woofdecoder.taxonomy import CATEGORIES, DISPLAY_NAMES
+from app.api.serialize import segment_json
+from woofdecoder.pipeline import Pipeline
+from woofdecoder.preprocess.media import describe_media
 
-STYLE = """
-:root { --bg:#f6f5f2; --card:#fff; --text:#222; --muted:#777; --line:#e5e2dc;
-        --accent:#c2652a; --bar:#e9e5de; --pos:#3c8d5a; --neg:#c0453b; }
-@media (prefers-color-scheme: dark) {
-  :root { --bg:#1b1a19; --card:#262523; --text:#eee; --muted:#999; --line:#3a3835;
-          --accent:#e08a4f; --bar:#3a3835; --pos:#6cc08a; --neg:#e57a70; }
-}
-* { box-sizing: border-box; }
-body { margin:0; background:var(--bg); color:var(--text);
-       font:15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; }
-main { max-width:760px; margin:0 auto; padding:32px 16px 64px; }
-h1 { margin:0 0 4px; font-size:28px; }
-h1 span { color:var(--accent); }
-.sub { color:var(--muted); margin:0 0 24px; }
-.card { background:var(--card); border:1px solid var(--line); border-radius:12px;
-        padding:20px; margin-bottom:16px; }
-form { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-input[type=file] { flex:1; min-width:0; }
-button { background:var(--accent); color:#fff; border:0; border-radius:8px;
-         padding:10px 18px; font-size:15px; cursor:pointer; }
-button:disabled { opacity:.6; cursor:wait; }
-.summary { color:var(--muted); margin:24px 0 12px; }
-.seg-head { display:flex; justify-content:space-between; align-items:baseline;
-            gap:12px; flex-wrap:wrap; }
-.time { color:var(--muted); font-variant-numeric:tabular-nums; }
-.verdict { font-size:22px; font-weight:600; margin:4px 0 16px; }
-.verdict .pct { color:var(--accent); }
-h4 { margin:18px 0 8px; font-size:13px; text-transform:uppercase;
-     letter-spacing:.05em; color:var(--muted); }
-.row { display:grid; grid-template-columns:150px 1fr 56px; gap:10px;
-       align-items:center; margin:4px 0; font-size:14px; }
-.track { background:var(--bar); border-radius:4px; height:10px; overflow:hidden; }
-.fill { background:var(--muted); height:100%; }
-.top .fill { background:var(--accent); }
-.top { font-weight:600; }
-.num { text-align:right; font-variant-numeric:tabular-nums; }
-.pos { color:var(--pos); } .neg { color:var(--neg); }
-.chips { display:flex; flex-wrap:wrap; gap:6px; }
-.chip { border:1px solid var(--line); border-radius:999px; padding:2px 10px; font-size:13px; }
-.note { color:var(--muted); font-size:12px; margin-top:4px; }
-.empty { text-align:center; color:var(--muted); }
-@media (max-width:480px) { .row { grid-template-columns:110px 1fr 48px; } }
-"""
+logger = logging.getLogger("woofdecoder.app")
 
-app = FastAPI(title="WoofDecoder")
-pipeline = Pipeline()  # load models once at startup
+WEB_DIR: Path = Path(__file__).resolve().parents[1] / "web"
+JOBS_DIR: Path = Path(tempfile.gettempdir()) / "woofdecoder_jobs"
+MAX_UPLOAD_BYTES: int = 200 * 1024 * 1024
+UPLOAD_CHUNK_BYTES: int = 1024 * 1024
+JOB_TTL_S: float = 3600.0  # delete a job (and its file) 1 hour after upload
+CLEANUP_EVERY_S: float = 300.0
+MEDIA_SUFFIXES: set[str] = {
+    ".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi",
+    ".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg", ".opus",
+}  # fmt: skip
 
 
-def page(body: str = "") -> str:
-    return f"""<!doctype html>
-<html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WoofDecoder</title><style>{STYLE}</style></head>
-<body><main>
-<h1>Woof<span>Decoder</span></h1>
-<p class="sub">Upload a clip of a dog. Each detected vocalization is classified from its audio.</p>
-<div class="card">
-  <form action="/predict" method="post" enctype="multipart/form-data"
-        onsubmit="this.querySelector('button').disabled=true;
-                  this.querySelector('button').textContent='Analyzing…';">
-    <input type="file" name="clip" accept="video/*,audio/*" required>
-    <button type="submit">Analyze</button>
-  </form>
-</div>
-{body}
-</main></body></html>"""
+@dataclass
+class Job:
+    id: str
+    path: Path
+    filename: str
+    created: float = field(default_factory=time.time)
+    status: str = "queued"  # queued | running | done | error
+    stage: str = "queued"
+    done: int = 0
+    total: int = 0
+    error: str | None = None
+    results: list[dict[str, Any]] | None = None
+
+    def as_json(self) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "job_id": self.id,
+            "filename": self.filename,
+            "status": self.status,
+            "stage": self.stage,
+            "done": self.done,
+            "total": self.total,
+        }
+        if self.error is not None:
+            data["error"] = self.error
+        if self.status == "done":
+            data["results"] = self.results
+        return data
 
 
-def bar_row(label: str, value: float, top: bool = False) -> str:
-    return (
-        f'<div class="row{" top" if top else ""}"><span>{escape(label)}</span>'
-        f'<div class="track"><div class="fill" style="width:{value * 100:.1f}%"></div></div>'
-        f'<span class="num">{value * 100:.1f}%</span></div>'
-    )
+jobs: dict[str, Job] = {}
+jobs_lock = threading.Lock()
 
 
-def segment_card(number: int, result: SegmentResult) -> str:
-    segment = result.segment
-    extras = result.extras
-    probs = result.output.as_dict()
+def run_job(pipeline: Pipeline, job: Job) -> None:
+    """Runs on the single worker thread."""
 
-    html = [
-        '<div class="card">',
-        (
-            f'<div class="seg-head"><strong>Segment {number}</strong>'
-            f'<span class="time">{segment.start_s:.2f} – {segment.end_s:.2f} s</span></div>'
-        ),
-        (
-            f'<div class="verdict">{escape(DISPLAY_NAMES[result.category])} '
-            f'<span class="pct">{result.probability * 100:.0f}%</span></div>'
-        ),
-        "<h4>All categories</h4>",
-    ]
-    for name in sorted(CATEGORIES, key=lambda category: probs[category], reverse=True):
-        html.append(bar_row(DISPLAY_NAMES[name], probs[name], top=name == result.category))
+    def progress(stage: str, done: int, total: int) -> None:
+        job.stage, job.done, job.total = stage, done, total
 
-    html.append("<h4>Why</h4>")
-    if segment.sound_sections:
-        chips = "".join(
-            f'<span class="chip">{escape(label)} {start:.2f}–{end:.2f}s</span>'
-            for label, (start, end), _ in segment.sound_sections
+    job.status = "running"
+    try:
+        results = pipeline.run(job.path, progress=progress)
+        job.results = [segment_json(number, result) for number, result in enumerate(results, 1)]
+        job.stage, job.done, job.total = "done", len(results), len(results)
+        job.status = "done"
+    except Exception as error:  # report any failure to the page instead of hanging
+        logger.exception("job %s failed", job.id)
+        job.error = f"The analysis failed: {error}"
+        job.status = "error"
+
+
+def delete_old_jobs(now: float) -> None:
+    with jobs_lock:
+        old = [
+            job
+            for job in jobs.values()
+            if now - job.created > JOB_TTL_S and job.status in ("done", "error")
+        ]
+        for job in old:
+            del jobs[job.id]
+    for job in old:
+        shutil.rmtree(job.path.parent, ignore_errors=True)
+
+
+async def cleanup_loop() -> None:
+    while True:
+        await asyncio.sleep(CLEANUP_EVERY_S)
+        delete_old_jobs(time.time())
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    app.state.pipeline = Pipeline()  # load every model once
+    app.state.executor = ThreadPoolExecutor(max_workers=1)  # one job at a time on the GPU
+    JOBS_DIR.mkdir(parents=True, exist_ok=True)
+    cleaner = asyncio.create_task(cleanup_loop())
+    try:
+        yield
+    finally:
+        cleaner.cancel()
+        with suppress(asyncio.CancelledError):
+            await cleaner
+        app.state.executor.shutdown(wait=False, cancel_futures=True)
+        shutil.rmtree(JOBS_DIR, ignore_errors=True)
+
+
+app = FastAPI(title="WoofDecoder", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def index() -> FileResponse:
+    return FileResponse(WEB_DIR / "index.html")
+
+
+def looks_like_media(upload: UploadFile) -> bool:
+    content_type = (upload.content_type or "").lower()
+    if content_type.startswith(("video/", "audio/")):
+        return True
+    return Path(upload.filename or "").suffix.lower() in MEDIA_SUFFIXES
+
+
+def save_upload(upload: UploadFile, path: Path) -> None:
+    """Copy the upload to path, stopping with 413 once it passes MAX_UPLOAD_BYTES."""
+    size = 0
+    with open(path, "wb") as out:
+        while chunk := upload.file.read(UPLOAD_CHUNK_BYTES):
+            size += len(chunk)
+            if size > MAX_UPLOAD_BYTES:
+                raise HTTPException(
+                    413, f"The file is larger than {MAX_UPLOAD_BYTES // (1024 * 1024)} MB."
+                )
+            out.write(chunk)
+    if size == 0:
+        raise HTTPException(400, "The file is empty.")
+
+
+def check_media(path: Path) -> None:
+    try:
+        info = describe_media(path, verbose=False)
+    except Exception as error:
+        raise HTTPException(415, "This is not a video or audio file the app can read.") from error
+    if not info["has_audio"]:
+        raise HTTPException(
+            422, "This file has no audio track, so there are no dog sounds to detect."
         )
-        html.append(f'<div class="chips">{chips}</div>')
-    if segment.confidence is not None:
-        html.append(f'<p class="note">Bark detector confidence: {segment.confidence:.2f}</p>')
-
-    for key in ("arousal", "valence"):
-        values = extras.get(key)
-        if not values:
-            continue
-        html.append(f"<h4>{key.capitalize()}</h4>")
-        best = max(values, key=values.get)
-        for name, value in values.items():
-            html.append(bar_row(name, value, top=name == best))
-        if key == "valence":
-            html.append('<p class="note">Valence is near chance on unseen dogs (notebook 24).</p>')
-
-    nudge = extras.get("nudge")
-    if nudge:
-        html.append("<h4>Emotion nudge (logit shift)</h4>")
-        for name, shift in nudge.items():
-            css = "pos" if shift > 0 else "neg" if shift < 0 else ""
-            category = str(name)  # extras is dict[str, Any]; nudge keys are category names
-            html.append(
-                f'<div class="row"><span>{escape(DISPLAY_NAMES.get(category, category))}</span><span></span>'
-                f'<span class="num {css}">{shift:+.2f}</span></div>'
-            )
-
-    shown = {"top_category", "arousal", "valence", "nudge"}
-    for key, value in extras.items():
-        if key not in shown:
-            html.append(f'<p class="note">{escape(key)}: {escape(str(value))}</p>')
-
-    html.append("</div>")
-    return "".join(html)
 
 
-@app.get("/", response_class=HTMLResponse)
-def index() -> str:
-    return page()
+@app.post("/api/jobs")
+def create_job(request: Request, clip: Annotated[UploadFile, File()]) -> dict[str, str]:
+    if not looks_like_media(clip):
+        raise HTTPException(415, "Please upload a video or audio file (e.g. .mp4, .mov, .wav).")
+    if clip.size is not None and clip.size > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, f"The file is larger than {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.")
+
+    job_id = uuid.uuid4().hex
+    job_dir = JOBS_DIR / job_id
+    job_dir.mkdir(parents=True)
+    suffix = Path(clip.filename or "").suffix.lower()
+    path = job_dir / f"upload{suffix if suffix in MEDIA_SUFFIXES else ''}"
+    try:
+        save_upload(clip, path)
+        check_media(path)
+    except HTTPException:
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise
+
+    job = Job(job_id, path, clip.filename or "clip")
+    with jobs_lock:
+        jobs[job_id] = job
+    request.app.state.executor.submit(run_job, request.app.state.pipeline, job)
+    return {"job_id": job_id}
 
 
-@app.post("/predict", response_class=HTMLResponse)
-def predict(clip: Annotated[UploadFile, File()]) -> str:
-    suffix = Path(clip.filename or "").suffix
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / f"upload{suffix}"
-        with open(path, "wb") as out:
-            shutil.copyfileobj(clip.file, out)
-        results = pipeline.run(path, verbose=True)
+def get_job(job_id: str) -> Job:
+    with jobs_lock:
+        job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, "This job was not found. Results are kept for 1 hour.")
+    return job
 
-    name = escape(clip.filename or "clip")
-    if not results:
-        return page(f'<div class="card empty">No dog vocalization detected in {name}.</div>')
 
-    cards = "".join(segment_card(number, result) for number, result in enumerate(results, 1))
-    return page(f'<p class="summary">{name} · {len(results)} segment(s)</p>{cards}')
+@app.get("/api/jobs/{job_id}")
+def job_status(job_id: str) -> dict[str, Any]:
+    return get_job(job_id).as_json()
+
+
+@app.get("/api/jobs/{job_id}/video")
+def job_video(job_id: str) -> FileResponse:
+    job = get_job(job_id)
+    media_type = mimetypes.guess_type(job.filename)[0] or "application/octet-stream"
+    return FileResponse(job.path, media_type=media_type)

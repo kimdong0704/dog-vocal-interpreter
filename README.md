@@ -125,7 +125,7 @@ Fusion video macro-F1, 95% CI: [0.362 0.866]. Fusion − audio learned, 95% CI:
 
 | Path | Contents |
 |---|---|
-| `app/` | FastAPI web app (`app/api/main.py`): upload a clip, get predictions per bark |
+| `app/` | FastAPI web app: `api/main.py` (upload jobs, progress, results JSON) and `web/` (plain HTML/CSS/JS page): upload a clip, pick a bark, see each step (preprocessing, audio, body, scene, fusion) and the result |
 | `configs/` | `pipeline.yaml` (the settings the app reads) and `datasets.yaml` (dataset list) |
 | `data/` | Local datasets and caches (not committed), except the shared splits in `data/splits/` |
 | `docs/` | Extra documentation; see [docs/INDEX.md](docs/INDEX.md) |
