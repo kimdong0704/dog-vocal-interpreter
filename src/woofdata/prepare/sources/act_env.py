@@ -19,7 +19,7 @@ from pathlib import Path, PurePosixPath
 import soundfile
 
 from woofdata.download.datasets import dataset_config
-from woofdata.fileio import read_csv, relative_data_path
+from woofdata.fileio import read_csv, relative_data_path, text_records
 from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.archives import list_archive_members, open_archive, open_member
 from woofdata.prepare.utils.audio import convert_audio
@@ -96,7 +96,7 @@ def read_labels(raw_dir: Path) -> dict[str, dict[str, str]]:
     and original_split added."""
     clips: dict[str, dict[str, str]] = {}
     for author_split, label_file in LABEL_FILES.items():
-        for record in read_csv(raw_dir / label_file).to_dict("records"):
+        for record in text_records(read_csv(raw_dir / label_file)):
             clip_id = make_clip_id(SOURCE, f"{author_split}/{record['audio_id']}{AUDIO_SUFFIX}")
             added = {
                 NORMALIZED_ENVIRONMENT_COLUMN: normalize_label(record[ENVIRONMENT_COLUMN]),

@@ -6,10 +6,11 @@ an offline experiment; it does not change the scene branch or write model files.
 
 from __future__ import annotations
 
+from typing import cast
 from urllib.parse import parse_qs, urlparse
 
 import numpy as np
-from scipy.optimize import minimize_scalar
+from scipy.optimize import OptimizeResult, minimize_scalar
 from scipy.special import logsumexp, softmax
 from sklearn.model_selection import StratifiedGroupKFold
 
@@ -174,7 +175,8 @@ def fit_temperature(mean_logits, labels, span_ids, bounds=(-6.0, 6.0)):
         losses = logsumexp(scaled, axis=1) - scaled[np.arange(len(y)), y.astype(int)]
         return float(_span_means(losses, spans)[0].mean())
 
-    result = minimize_scalar(objective, bounds=bounds, method="bounded")
+    # cast: scipy's hints say minimize_scalar returns object; it returns an OptimizeResult.
+    result = cast(OptimizeResult, minimize_scalar(objective, bounds=bounds, method="bounded"))
     if not result.success or not np.isfinite(result.fun):
         raise RuntimeError("Temperature optimization did not converge")
     return float(np.exp(result.x))

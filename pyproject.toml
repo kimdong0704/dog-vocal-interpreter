@@ -47,11 +47,14 @@ app = [
     "python-multipart",
     "uvicorn[standard]",
 ]
-# Linting and notebooks (tqdm is used by notebooks 15, 40 and 50).
+# Linting, type checking and notebooks (tqdm is used by notebooks 15, 40 and 50).
+# pandas-stubs matches the pandas types Pylance shows in VS Code, so `pyright` agrees with it.
 dev = [
     "ipykernel",
     "matplotlib",
     "nbstripout",
+    "pandas-stubs~=3.0.5",
+    "pyright",
     "ruff",
     "tqdm",
 ]
@@ -62,3 +65,15 @@ where = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.pyright]
+include = ["src", "app", "tests"]
+exclude = ["**/__pycache__", ".venv", "third_party", "data", "models", "notebooks"]
+# The BEATs and bark-detector (PretrainedSED) code is added to sys.path at runtime.
+extraPaths = ["third_party/unilm/beats", "third_party/PretrainedSED"]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false      # many ML libraries ship without stubs
+reportMissingModuleSource = false

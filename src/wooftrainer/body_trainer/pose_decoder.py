@@ -181,7 +181,14 @@ def score_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float
     return {
         "accuracy": float((y_true == y_pred).mean()),
         "macro_f1": float(
-            f1_score(y_true, y_pred, labels=range(NUM_CLASSES), average="macro", zero_division=0)
+            f1_score(
+                y_true,
+                y_pred,
+                labels=range(NUM_CLASSES),
+                average="macro",
+                # sklearn is untyped; pyright infers str from the default "warn", but 0 is valid.
+                zero_division=0,  # pyright: ignore[reportArgumentType]
+            )
         ),
     }
 
@@ -212,7 +219,12 @@ def evaluate_pose_decoder(
         columns=pd.Index(DECODER_CLASSES, name="predicted"),
     )
     report = classification_report(
-        y, predictions, labels=range(NUM_CLASSES), target_names=DECODER_CLASSES, zero_division=0
+        y,
+        predictions,
+        labels=range(NUM_CLASSES),
+        target_names=DECODER_CLASSES,
+        # sklearn is untyped; pyright infers str from the default "warn", but 0 is valid.
+        zero_division=0,  # pyright: ignore[reportArgumentType]
     )
     baseline = majority_baseline(splits.y_train, y)
 

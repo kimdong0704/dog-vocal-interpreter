@@ -105,20 +105,20 @@ def fit_linear_head(
     model = LogisticRegression(C=C, max_iter=MAX_ITER)
     model.fit(scaler.transform(features), labels, sample_weight=weights)
 
-    coefficients = model.coef_
-    intercepts = model.intercept_
+    # sklearn types its fitted attributes loosely (float | ndarray); they are arrays after fit.
+    coefficients = np.asarray(model.coef_)  # (num_classes or 1, dim)
+    intercepts = np.asarray(model.intercept_)  # (num_classes or 1,)
     if len(model.classes_) == 2:
         coefficients = np.vstack([-coefficients[0] / 2, coefficients[0] / 2])
         intercepts = np.array([-intercepts[0] / 2, intercepts[0] / 2])
-    assert (
-        scaler.mean_ is not None and scaler.scale_ is not None
-    )  # set by fit (with_mean/with_std on)
+    if scaler.mean_ is None or scaler.scale_ is None:
+        raise RuntimeError("StandardScaler did not set mean_ / scale_ (with_mean/with_std off?)")
     return LinearHead(
         classes=model.classes_.tolist(),
         weights=coefficients,
         bias=intercepts,
-        mean=scaler.mean_,
-        scale=scaler.scale_,
+        mean=np.asarray(scaler.mean_),  # (dim,)
+        scale=np.asarray(scaler.scale_),  # (dim,)
         layer=layer,
         encoder=encoder,
     )

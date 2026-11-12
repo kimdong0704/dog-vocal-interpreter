@@ -111,13 +111,24 @@ class SceneEncoder(Branch):
         self.confidence_weight = float(confidence_weight)
         self.class_bias = bias
         self.prompts = [prompts[category] for category in CATEGORIES]
-        self.model = CLIPModel.from_pretrained(model, revision=revision).to(self.device).eval()
+        # revision=None keeps transformers' own default revision.
+        pretrained_options = {} if revision is None else {"revision": revision}
+        self.model = CLIPModel.from_pretrained(model, **pretrained_options)
+        # transformers' hint for Module.to() wrongly expects a CLIPModel as the argument.
+        self.model = self.model.to(self.device).eval()  # pyright: ignore[reportArgumentType]
         self.model.requires_grad_(False)
-        self.processor = CLIPProcessor.from_pretrained(model, revision=revision)
-        self.dim = self.model.config.projection_dim
-        self.text_inputs = self.processor(text=self.prompts, return_tensors="pt", padding=True).to(
-            self.device
-        )
+        self.processor = CLIPProcessor.from_pretrained(model, **pretrained_options)
+        projection_dim = self.model.config.projection_dim
+        if projection_dim is None:
+            raise ValueError(f"CLIP model {model!r} has no projection_dim in its config")
+        self.dim = int(projection_dim)
+        # The processor accepts tokenizer options (return_tensors, padding) at runtime, but its
+        # Unpack[ProcessingKwargs] hint only lists the nested per-modality kwargs.
+        self.text_inputs = self.processor(
+            text=self.prompts,
+            return_tensors="pt",  # pyright: ignore[reportCallIssue]
+            padding=True,  # pyright: ignore[reportCallIssue]
+        ).to(self.device)
         self.schema = {
             "encoder": self.name,
             "model": model,
@@ -165,7 +176,8 @@ class SceneEncoder(Branch):
         self.model.eval()
         for start in range(0, len(images), self.batch_size):
             inputs = self.processor(
-                images=images[start : start + self.batch_size], return_tensors="pt"
+                images=images[start : start + self.batch_size],
+                return_tensors="pt",  # pyright: ignore[reportCallIssue]  # see __init__
             ).to(self.device)
             output = self.model(**inputs, **self.text_inputs)
             logits.append(output.logits_per_image.float().cpu().numpy())

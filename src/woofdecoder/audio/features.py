@@ -27,4 +27,4 @@ def select_layer(embeddings: np.ndarray, layer: Layer) -> np.ndarray:
     check_layer(layer, embeddings.shape[-2])
     if layer == LAYER_MEAN:
         return embeddings.mean(axis=-2)
-    return embeddings[..., layer, :]
+    return embeddings[..., int(layer), :]  # check_layer() guarantees an int here

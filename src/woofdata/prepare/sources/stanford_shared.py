@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from woofdata.fileio import read_csv
+from woofdata.fileio import read_csv, text_records
 from woofdata.prepare.manifest import processed_dir
 from woofdata.prepare.utils.hash_splits import split_from_hash
 from woofdata.settings import (
@@ -82,6 +82,6 @@ def read_index(data_dir: Path | None = None) -> dict[str, dict[str, str]]:
     if not index_path.is_file():
         raise ValueError(f"{index_path} is missing; prepare stanford_dogs first")
     index: dict[str, dict[str, str]] = {}
-    for record in read_csv(index_path).to_dict("records"):
+    for record in text_records(read_csv(index_path)):
         index[record["image_key"]] = record
     return index

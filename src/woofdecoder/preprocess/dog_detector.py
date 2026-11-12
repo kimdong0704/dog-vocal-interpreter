@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from woofdecoder.preprocess.segments import BarkSegment
+
+if TYPE_CHECKING:
+    from rfdetr.detr import RFDETR  # rfdetr is optional; imported at runtime in load_dog_detector
 
 DOG_CLASS_NAME: str = "dog"
 
@@ -15,7 +19,7 @@ Box = np.ndarray
 
 @dataclass
 class DogDetector:
-    model: object
+    model: RFDETR
     score_threshold: float
 
 
@@ -46,7 +50,9 @@ def detect_dogs(detector: DogDetector, frames: list[np.ndarray]) -> list[list[tu
     if not frames:
         return []
 
-    results = detector.model.predict(list(frames), threshold=detector.score_threshold)
+    # Any: rfdetr types predict() as a union also covering keypoint models; a detection
+    # model returns supervision Detections (or a list of them) with xyxy/class_id/confidence.
+    results: Any = detector.model.predict(list(frames), threshold=detector.score_threshold)
 
     if len(frames) == 1 and not isinstance(results, list):
         results = [results]

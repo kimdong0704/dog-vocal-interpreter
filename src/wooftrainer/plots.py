@@ -10,6 +10,7 @@ from collections.abc import Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.axes import Axes
 
 from woofdecoder.taxonomy import DISPLAY_NAMES
 
@@ -21,7 +22,9 @@ X_TICK_ROTATION_DEGREES: float = 35.0
 
 
 def confusion_counts(
-    true: Sequence[str], predicted: Sequence[str], labels: Sequence[str]
+    true: Sequence[str] | np.ndarray,
+    predicted: Sequence[str] | np.ndarray,
+    labels: Sequence[str],
 ) -> np.ndarray:
     """Count (true, predicted) pairs.
 
@@ -75,13 +78,13 @@ def tick_names(labels: Sequence[str]) -> list[str]:
 
 
 def plot_confusion_matrix(
-    true: Sequence[str],
-    predicted: Sequence[str],
+    true: Sequence[str] | np.ndarray,
+    predicted: Sequence[str] | np.ndarray,
     labels: Sequence[str],
     title: str,
     normalize: bool = True,
-    ax: plt.Axes | None = None,
-) -> plt.Axes:
+    ax: Axes | None = None,
+) -> Axes:
     """Draw a confusion matrix: rows = true, columns = predicted, both in labels order.
 
     Args:

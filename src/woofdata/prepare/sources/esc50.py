@@ -14,7 +14,7 @@ import tempfile
 from pathlib import Path, PurePosixPath
 
 from woofdata.download.datasets import dataset_config
-from woofdata.fileio import read_csv, relative_data_path
+from woofdata.fileio import read_csv, relative_data_path, text_records
 from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.archives import extract_members
 from woofdata.prepare.utils.audio import convert_audio
@@ -142,7 +142,7 @@ def prepare(raw_dir: Path, out_dir: Path) -> list[ManifestRow]:
             audio_by_name[audio_path.name] = audio_path
 
         metadata = read_csv(metadata_path)
-        clips = metadata.to_dict("records")
+        clips = text_records(metadata)
         lowest_fold = lowest_fold_by_source(clips)
         source_version = archive_commit(SOURCE)
         moved_count = 0

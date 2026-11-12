@@ -112,7 +112,7 @@ def segment_card(number: int, result: SegmentResult) -> str:
         ),
         "<h4>All categories</h4>",
     ]
-    for name in sorted(CATEGORIES, key=probs.get, reverse=True):
+    for name in sorted(CATEGORIES, key=lambda category: probs[category], reverse=True):
         html.append(bar_row(DISPLAY_NAMES[name], probs[name], top=name == result.category))
 
     html.append("<h4>Why</h4>")
@@ -141,8 +141,9 @@ def segment_card(number: int, result: SegmentResult) -> str:
         html.append("<h4>Emotion nudge (logit shift)</h4>")
         for name, shift in nudge.items():
             css = "pos" if shift > 0 else "neg" if shift < 0 else ""
+            category = str(name)  # extras is dict[str, Any]; nudge keys are category names
             html.append(
-                f'<div class="row"><span>{escape(DISPLAY_NAMES.get(name, name))}</span><span></span>'
+                f'<div class="row"><span>{escape(DISPLAY_NAMES.get(category, category))}</span><span></span>'
                 f'<span class="num {css}">{shift:+.2f}</span></div>'
             )
 

@@ -116,9 +116,9 @@ class BodyBranch(Branch):
     ):
         from ultralytics import YOLO  # imported here so the rest of the package works without it
 
-        encoder_path = REPO_ROOT / (encoder_path or BODY_CONFIG["pose"])
-        decoder_path = REPO_ROOT / (decoder_path or BODY_CONFIG["head"])
-        for path in (encoder_path, decoder_path):
+        encoder_file: Path = REPO_ROOT / (encoder_path or BODY_CONFIG["pose"])
+        decoder_file: Path = REPO_ROOT / (decoder_path or BODY_CONFIG["head"])
+        for path in (encoder_file, decoder_file):
             if not path.exists():
                 raise FileNotFoundError(
                     f"{path} not found. Weights are not in git: copy them in "
@@ -126,9 +126,9 @@ class BodyBranch(Branch):
                 )
 
         self.device = pick_device()
-        self.encoder = YOLO(str(encoder_path))
+        self.encoder = YOLO(str(encoder_file))
         self.decoder = PoseClassifier().to(self.device)
-        self.decoder.load_state_dict(torch.load(decoder_path, map_location=self.device))
+        self.decoder.load_state_dict(torch.load(decoder_file, map_location=self.device))
         self.decoder.eval()
 
     def predict(self, segment: BarkSegment) -> BranchOutput:

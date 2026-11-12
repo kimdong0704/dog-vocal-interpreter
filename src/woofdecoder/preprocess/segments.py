@@ -181,7 +181,7 @@ class BarkSegment:
         confidence_text = "unknown" if self.confidence is None else f"{self.confidence:.2f}"
         print(f"{'confidence':<12}{confidence_text}")
 
-        if self.has_audio:
+        if self.audio is not None and self.has_audio:
             audio_text = f"{self.audio.size} samples @ {self.sample_rate} Hz"
         else:
             audio_text = "none"

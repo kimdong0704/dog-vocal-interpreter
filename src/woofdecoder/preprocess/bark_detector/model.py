@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 from dataclasses import dataclass
+from typing import Any
 
 import torch
 
@@ -28,9 +29,10 @@ AUDIOSET_CLASSES_PER_SED: dict[str, list[str]] = {
 class BarkDetector:
     # The loaded SED model + what is needed to read its outputs as we wanted
 
-    model: torch.nn.Module
+    # Any: PretrainedSED's PredictionsWrapper (third_party, untyped); it adds mel_forward.
+    model: Any
     class_names: list[str]  # 447 Audioset strong classes, in output order
-    columns_per_sed: dict[str, list[str]]  # SED class -> its columns in the 447 outputs
+    columns_per_sed: dict[str, list[int]]  # SED class -> its columns in the 447 outputs
     device: torch.device
 
 

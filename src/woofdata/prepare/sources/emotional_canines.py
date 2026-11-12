@@ -15,7 +15,7 @@ from pathlib import Path
 import pandas as pd
 
 from woofdata.download.datasets import dataset_config
-from woofdata.fileio import read_csv, relative_data_path
+from woofdata.fileio import read_csv, relative_data_path, text_records
 from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.audio import convert_audio
 from woofdata.prepare.utils.label_files import write_labels
@@ -46,7 +46,7 @@ def read_split_labels(raw_dir: Path, folder: str) -> list[dict[str, str]]:
     clips: list[dict[str, str]] = []
     for breed in BREEDS:
         breed_labels_path = labels_path(raw_dir, breed, folder)
-        for record in read_csv(breed_labels_path).to_dict("records"):
+        for record in text_records(read_csv(breed_labels_path)):
             audio_path = raw_dir / folder / breed / f"{record['audio_id']}.wav"
             if not audio_path.is_file():
                 raise ValueError(f"{breed_labels_path.name} lists {audio_path.name}, not on disk")

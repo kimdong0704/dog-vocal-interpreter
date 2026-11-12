@@ -122,7 +122,7 @@ class AudioEncoder(ABC):
         return pooled.permute(1, 0, 2).cpu().numpy(), num_patches.cpu().numpy()
 
     def embed(self, segment: BarkSegment) -> np.ndarray | None:
-        if not segment.has_audio:
+        if segment.audio is None or not segment.has_audio:
             return None
         return self.embed_waveforms([segment.audio], segment.sample_rate)[0]
 

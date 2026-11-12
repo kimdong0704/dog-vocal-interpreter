@@ -115,7 +115,7 @@ TASKS: dict[str, Task] = {
         ("act_env", "playpant", "self_labeled"),
         AudioContextSample,
         CLIP_MAX_SECONDS,
-        self_labeled_collection=("audio"),
+        self_labeled_collection=("audio",),
     ),
     "audio_emotion": Task(("emotional_canines",), AudioEmotionSample, CLIP_MAX_SECONDS),
     "pose": Task(("stanfordextra",), PoseSample),

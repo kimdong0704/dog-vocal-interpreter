@@ -54,3 +54,18 @@ def write_csv(frame: pd.DataFrame, path: Path) -> None:
 def read_csv(path: Path) -> pd.DataFrame:
     """Read a rows or manifest CSV with every column as text ("" for empty cells)."""
     return pd.read_csv(path, dtype=str, keep_default_na=False)
+
+
+def text_records(table: pd.DataFrame) -> list[dict[str, str]]:
+    """Return table's rows as {column: cell text} dicts, for tables read as text.
+
+    pandas types to_dict("records") as dict[Hashable, Any]; str() states that the columns
+    and cells are already text (read_csv above), so it does not change any value.
+    """
+    records: list[dict[str, str]] = []
+    for record in table.to_dict("records"):
+        text_record: dict[str, str] = {}
+        for column, value in record.items():
+            text_record[str(column)] = str(value)
+        records.append(text_record)
+    return records

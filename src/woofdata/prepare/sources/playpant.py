@@ -26,7 +26,7 @@ from typing import Any
 
 import pandas as pd
 
-from woofdata.fileio import relative_data_path
+from woofdata.fileio import relative_data_path, text_records
 from woofdata.prepare.manifest import ManifestRow, make_clip_id
 from woofdata.prepare.utils.archives import list_archive_members, open_archive, open_member
 from woofdata.prepare.utils.audio import convert_audio
@@ -117,7 +117,7 @@ def read_metadata(path: Path) -> dict[str, dict[str, str]]:
     """Return {session id: its 05 Metadata.csv row, every column as text}."""
     metadata = pd.read_csv(path, sep=METADATA_SEPARATOR, dtype=str, keep_default_na=False)
     metadata_by_session: dict[str, dict[str, str]] = {}
-    for record in metadata.to_dict("records"):
+    for record in text_records(metadata):
         metadata_by_session[record["Audio_file"].removesuffix(RECORDING_SUFFIX)] = record
     return metadata_by_session
 
