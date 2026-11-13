@@ -121,6 +121,30 @@ Fusion video macro-F1, 95% CI: [0.362 0.866]. Fusion − audio learned, 95% CI:
 
 ---
 
+## Dataset
+
+All raw datasets are listed in [configs/datasets.yaml](configs/datasets.yaml), with the
+source link, pinned revision, expected size and license page of each one. The choice of
+datasets and what each one is used for are worked out in
+[notebook 00](notebooks/00_data_brainstorming.ipynb).
+
+```bash
+python -m woofdata.download            # download every dataset (≈ 8 GB)
+python -m woofdata.download <id>       # download one dataset, e.g. esc50
+```
+
+Files go to `<data_dir>/raw/<id>/`. Kaggle and Roboflow datasets need API keys, and the
+`self_labeled` videos are added by hand.
+
+| Stage | Datasets (`id`) |
+|---|---|
+| Audio | `playpant`, `audioset_strong_eval`, `esc50`, `act_env`, `emotional_canines` |
+| Body (pose, posture, emotion) | `stanford_dogs`, `stanfordextra`, `dog_pose`, `dogposecv`, `dog_emotion_kaggle`, `rf_dog_emotion` |
+| Scene | `rf_leash`, `rf_bowl` |
+| Fusion and missing categories | `self_labeled` |
+
+---
+
 ## Repository structure
 
 | Path | Contents |
@@ -153,3 +177,30 @@ Fusion video macro-F1, 95% CI: [0.362 0.866]. Fusion − audio learned, 95% CI:
   guessing among 5 categories; only the learned scene head and fusion use them well.
 - **Small test set.** Test has 18 videos with a segment, so the confidence intervals are wide
   (fusion video macro-F1 95% CI [0.362 0.866]; fusion − audio learned [-0.122 0.344]).
+---
+
+## AI Disclosure
+
+We used AI assistants during this project for the tasks below. All code and results were
+reviewed and run by the team.
+
+**General**
+- Writing this README.
+- Organizing the project architecture.
+- The dataset downloader (`python -m woofdata.download`).
+- Part of the data preparation (`python -m woofdata.prepare`).
+
+**Audio branch and preprocessing**
+- Explaining the results of the notebooks used to tune the model.
+- Saving and loading the model.
+- How to use the encoder model.
+- Planning how to deal with class imbalance and the model taking shortcuts.
+- Checking for data leakage.
+- Building the matplotlib confusion matrix plots.
+- Refactoring to move reused constants, functions and classes into shared modules.
+- Debugging.
+
+**Body branch**
+- Fine-tuning the pose encoder: how to run it on the servers and how big the model
+  should be.
+- Planning the data frame structure and the normalization step.

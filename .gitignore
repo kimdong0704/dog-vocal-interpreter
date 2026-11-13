@@ -267,7 +267,6 @@ third_party/*
 data/*
 !data/splits/
 !data/splits/**
-!data/raw/self_labeled/labels.csv
 
 # Models: ignore everything except any heads/ folder (at any depth) and models/fusion/.
 # models/** ignores every file; !models/**/ lets git look inside folders (the files in them
