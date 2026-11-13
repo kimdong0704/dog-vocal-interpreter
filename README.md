@@ -205,6 +205,10 @@ reviewed and run by the team.
   should be.
 - Planning the data frame structure and the normalization step.
 
+**Scene-Context branch**
+- Implementation of CLIP model
+- Extraction of bias and variations of weight distribution calibration in the scene branch to improve accuracy outside of training
+
 **Fusion**
 - Caching branch outputs per segment so the fusion head can be refit without rerunning
   the branches (notebook 50).
