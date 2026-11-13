@@ -204,3 +204,10 @@ reviewed and run by the team.
 - Fine-tuning the pose encoder: how to run it on the servers and how big the model
   should be.
 - Planning the data frame structure and the normalization step.
+
+**Fusion**
+- Caching branch outputs per segment so the fusion head can be refit without rerunning
+  the branches (notebook 50).
+- The video-level bootstrap for the confidence intervals (notebooks 51 and 52).
+- Saving and loading the fusion head (`models/fusion/`) for the app.
+- Debugging.
